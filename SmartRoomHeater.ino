@@ -11,7 +11,7 @@ extern "C" {
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 #include <Wire.h>
-#include <ESP8266WiFi.h> 
+#include <ESP8266WiFi.h>
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
@@ -37,14 +37,14 @@ const char  *password               = "polkalol";
 const int   sleepTimeS              = 10;  // Time to sleep (in seconds):
 int         counter                 = 0;
 bool        heaterStatus            = 0;
-float       MAX_POSSIBLE_TMP        = 27;
+float       MAX_POSSIBLE_TMP        = 28;
 bool        secure_disabled         = false;
 float       temperatureKeep         = 24;
 float       current_temp            = -10;
 OneWire             oneWire(ONE_WIRE_BUS);
 DallasTemperature   sensor(&oneWire);
 ESP8266WebServer    server(80);
-DeviceAddress       insideThermometer; // arrays to hold device address
+DeviceAddress       insideThermometer[2]; // arrays to hold device address
 WiFiUDP ntpUDP;
 
 
@@ -64,7 +64,7 @@ ADC_MODE(ADC_VCC);
 String  getAddressString(DeviceAddress deviceAddress);
 void    disableHeater();
 void    enableHeater();
-float   getTemperature();
+float   getTemperature(int dev=0);
 String  printTemperatureToSerial();
 String  read_setting(const char* fname);
 void    save_setting(const char* fname, String value);
@@ -80,7 +80,7 @@ void setup(void) {
   pinMode(HEATER_VCC, OUTPUT);
   disableHeater();
   sensor.begin();
-  Serial.begin(115200);
+  Serial.begin(921600);
   Serial.println("");
   Serial.println("PASS: Serial communication started.");
   Serial.println("INFO: Starting SPIFFS...");
@@ -88,7 +88,7 @@ void setup(void) {
   Serial.println("PASS: SPIFFS startted.");
   //  Serial.println("INFO: Compile SPIFFS");
   //  SPIFFS.format();
-  
+
   WiFi.mode(WIFI_AP_STA);       //  Disable AP Mode
   WiFi.begin(ssid, password);
 
@@ -122,12 +122,15 @@ void setup(void) {
     Serial.println("OFF");
   }
 
-  if (!sensor.getAddress(insideThermometer, 0)) {
+  if (!sensor.getAddress(insideThermometer[0], 0)) {
     Serial.println("Unable to find address for Device 0");
   }
-
+  if (!sensor.getAddress(insideThermometer[1], 0)) {
+    Serial.println("Unable to find address for Device 0");
+  }
   // set the resolution to 9 bit (Each Dallas/Maxim device is capable of several different resolutions)
-  sensor.setResolution(insideThermometer, 11);
+  sensor.setResolution(insideThermometer[0], 11);
+  sensor.setResolution(insideThermometer[1], 11);
   server.on("/", handleRoot);
   server.on("/inline", []() {
     server.send(200, "text/plain", "this works as well");
@@ -211,7 +214,7 @@ void loop(void) {
     Serial.println("getSketchSize: " + String(ESP.getSketchSize()) + "\t\t getFreeSketchSpace: " + String(ESP.getFreeSketchSpace()));
     //Serial.println("getResetReason: " + ESP.getResetReason());
     //Serial.println("getResetInfo: " + ESP.getResetInfo());
-    Serial.println("Address : " + getAddressString(insideThermometer));
+    Serial.println("Address : " + getAddressString(insideThermometer[0]));
   }
 
   if (WiFi.status() != WL_CONNECTED) {
@@ -251,7 +254,7 @@ String build_index() {
                   "'rssi': '" + WiFi.RSSI() + "'," +
                   "'sketch_size': '" + String(ESP.getSketchSize()) + "'," +
                   "'free_sketch_size': '" + String(ESP.getFreeSketchSpace()) + "'," +
-                  "'dallas_addr': '" + getAddressString(insideThermometer) + "'," +
+                  "'dallas_addr': '" + getAddressString(insideThermometer[0]) + "'," +
                   "'time_str': '" + timeClient.getFormattedTime() + "'," +
                   "'time_epoch': '" + timeClient.getEpochTime() + "'," +
                   "'hostname': '" + WiFi.hostname() + "'" +
@@ -268,7 +271,7 @@ String build_index() {
 }
 
 /**
- * 
+ *
  */
 String build_device_info() {
   String ret = "<pre>\t\t\t Heater status: " + String(heaterStatus);
@@ -281,12 +284,12 @@ String build_device_info() {
   ret += "\ngetSketchSize: " + String(ESP.getSketchSize()) + "\t\t getFreeSketchSpace: " + String(ESP.getFreeSketchSpace());
   //ret += "\ngetResetReason: " + ESP.getResetReason();
   //ret += "\ngetResetInfo: " + ESP.getResetInfo();
-  ret += "\nAddress : " + getAddressString(insideThermometer) + "</pre>";
+  ret += "\nAddress : " + getAddressString(insideThermometer[0]) + "</pre>";
   return ret;
 }
 
 /**
- * 
+ *
  */
 void handleRoot() {
 
@@ -315,7 +318,7 @@ void saveLoadMode() {
       Serial.println("Keep temperature " + String(temperatureKeep));
       if (temperatureKeep > MAX_POSSIBLE_TMP) {
         temperatureKeep = MAX_POSSIBLE_TMP;
-        Serial.println("Override Keep temperature " + String(temperatureKeep));
+        Serial.println("Override Keep temperature to MAX_POSSIBLE_TMP " + String(temperatureKeep));
       }
     }
   }
@@ -385,18 +388,25 @@ void disableHeater() {
 /**
    Get Temperature
 */
-float getTemperature() {
+float getTemperature(int dev/*=0*/) {
+  Serial.println("DEBUG: Requesting device " + String(dev));
+  sensor.setWaitForConversion(false);  // makes it async
   sensor.requestTemperatures();
-  return sensor.getTempC(insideThermometer);
+  sensor.setWaitForConversion(true);  // makes it async
+  return sensor.getTempCByIndex(dev);
+  //return sensor.getTempC(insideThermometer[dev]);
 }
 
 /**
    Get end print temperature to serial
 */
 String printTemperatureToSerial() {
-  current_temp       = getTemperature();
-  Serial.print("INFO: Temperature C: ");
-  Serial.println(current_temp);
+  int dc = sensor.getDeviceCount();
+  for (int i = 0 ; i<dc;i++){
+    current_temp       = getTemperature(i);
+    Serial.print("INFO: Temperature["+ String(i) +"] C: ");
+    Serial.println(current_temp);
+  }
   return String(current_temp);
 }
 
@@ -433,4 +443,3 @@ String read_setting(const char* fname) {
   }
   return s;
 }
- 
