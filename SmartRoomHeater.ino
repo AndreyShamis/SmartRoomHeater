@@ -31,9 +31,13 @@ typedef enum {
 #define   NUMBER_OF_DEVICES         1
 #define   CS_PIN                    D3
 #define   TEMPERATURE_PRECISION     11
+
+#define   NTP_SERVER                "europe.pool.ntp.org"
+#define   NTP_TIME_OFFSET_SEC       10800
+#define   NTP_UPDATE_INTERVAL_MS    60000
+
 const char  *ssid                   = "RadiationG";
 const char  *password               = "polkalol";
-
 const int   sleepTimeS              = 10;  // Time to sleep (in seconds):
 int         counter                 = 0;
 bool        heaterStatus            = 0;
@@ -41,6 +45,8 @@ float       MAX_POSSIBLE_TMP        = 26;
 bool        secure_disabled         = false;
 float       temperatureKeep         = 22;
 float       current_temp            = -10;
+int         outsideThermometerIndex = 0;
+
 OneWire             oneWire(ONE_WIRE_BUS);
 DallasTemperature   sensor(&oneWire);
 ESP8266WebServer    server(80);
@@ -51,7 +57,7 @@ WiFiUDP ntpUDP;
 // You can specify the time server pool and the offset (in seconds, can be
 // changed later with setTimeOffset() ). Additionaly you can specify the
 // update interval (in milliseconds, can be changed using setUpdateInterval() ).
-NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 10800, 60000);
+NTPClient timeClient(ntpUDP, NTP_SERVER, NTP_TIME_OFFSET_SEC, NTP_UPDATE_INTERVAL_MS);
 
 LoadModeType loadMode = MANUAL;
 //enum ADCMode {
@@ -62,8 +68,8 @@ LoadModeType loadMode = MANUAL;
 //};
 ADC_MODE(ADC_VCC);
 String  getAddressString(DeviceAddress deviceAddress);
-void    disableHeater();
-void    enableHeater();
+void    disableLoad();
+void    enableLoad();
 float   getTemperature(int dev = 0);
 String  printTemperatureToSerial();
 String  read_setting(const char* fname);
@@ -78,7 +84,7 @@ void    save_setting(const char* fname, String value);
 void setup(void) {
   //ADC_MODE(ADC_VCC);
   pinMode(HEATER_VCC, OUTPUT);
-  disableHeater();
+  disableLoad();
   sensor.begin();
   Serial.begin(921600);
   Serial.println("");
@@ -111,7 +117,9 @@ void setup(void) {
     Serial.println("PASS: MDNS responder started");
   }
   Serial.println("-----------------------------------");
-  Serial.print("Found ");
+  timeClient.begin();
+
+  Serial.print("INFO: Found ");
   Serial.print(sensor.getDeviceCount(), DEC);
   Serial.println(" devices.");
   Serial.print("Parasite power is: ");
@@ -123,11 +131,14 @@ void setup(void) {
   }
   for (int i = 0; i < sensor.getDeviceCount(); i++) {
     if (!sensor.getAddress(insideThermometer[i], i)) {
-      Serial.println("Unable to find address for Device 0");
+      Serial.println("Unable to find address for Device " + String(i));
     }
     else {
       // set the resolution to 9 bit (Each Dallas/Maxim device is capable of several different resolutions)
       sensor.setResolution(insideThermometer[i], TEMPERATURE_PRECISION);
+      Serial.print("INFO: Device " + String(i) + " Resolution: ");
+      Serial.print(sensor.getResolution(insideThermometer[i]), DEC);
+      Serial.println();
     }
   }
 
@@ -136,18 +147,23 @@ void setup(void) {
   //  }
   //  sensor.setResolution(insideThermometer[0], 11);;
   //  sensor.setResolution(insideThermometer[1], 11);
+
   server.on("/", handleRoot);
   server.on("/inline", []() {
     server.send(200, "text/plain", "this works as well");
   });
   server.on("/el", []() {
-    enableHeater();
+    enableLoad();
     loadMode = MANUAL;
     handleRoot();
   });
   server.on("/dl", []() {
-    disableHeater();
+    disableLoad();
     loadMode = MANUAL;
+    handleRoot();
+  });
+  server.on("/setDallasIndex", [](){
+    uploadAndSaveOutsideThermometerIndex();
     handleRoot();
   });
   server.on("/keep", []() {
@@ -163,10 +179,21 @@ void setup(void) {
   //  save_setting("/password", password);
   Serial.println(read_setting("/ssid"));
   Serial.println(read_setting("/password"));
+
+  String outsideThermometerIndexString = read_setting("/outTmpIndex");
+  
+  if (outsideThermometerIndexString == "") {
+    saveOutsideThermometerIndex(outsideThermometerIndex);
+  }
+  else{
+    outsideThermometerIndex = outsideThermometerIndexString.toInt();
+  }
+
   // Sleep
   //Serial.println("ESP8266 in sleep mode");
   //ESP.deepSleep(sleepTimeS * 1000000, RF_DEFAULT);
-  timeClient.begin();
+
+  //delay(250);
   timeClient.update();
 
 }
@@ -179,19 +206,19 @@ void loop(void) {
 
   server.handleClient();
   if (counter % 50 == 0) {
-    current_temp = getTemperature();
+    current_temp = getTemperature(outsideThermometerIndex);
   }
   if (loadMode == KEEP && !heaterStatus) {
     if (current_temp < temperatureKeep &&  current_temp < MAX_POSSIBLE_TMP && current_temp > 0) {
       Serial.println("WARNING: Keep enabled, enable load");
-      enableHeater();
+      enableLoad();
     }
   }
   if (heaterStatus) {
     if (current_temp > MAX_POSSIBLE_TMP || (loadMode == KEEP && current_temp > temperatureKeep)) {
       Serial.println("WARNING: Current temperature is bigger of possible maximum. " + String(current_temp) + ">" + String(MAX_POSSIBLE_TMP));
       Serial.println("WARNING: Disabling Load");
-      disableHeater();
+      disableLoad();
       secure_disabled = true;
     }
   }
@@ -199,7 +226,7 @@ void loop(void) {
   if (current_temp < 1) {
     Serial.println("WARNING: Very LOW temperatute. " + String(current_temp));
     Serial.println("WARNING: Disabling Load");
-    disableHeater();
+    disableLoad();
     secure_disabled = true;
   }
 
@@ -208,6 +235,7 @@ void loop(void) {
     printTemperatureToSerial();
   }
   if (counter == 5) {
+    timeClient.update();
     Serial.println("INFO: -----------------------------------------------------------------------");
     Serial.println("Heater status: " + String(heaterStatus));
     Serial.println("getFlashChipId: " + String(ESP.getFlashChipId()) + "\t\t getFlashChipSize: " + String(ESP.getFlashChipSize()));
@@ -244,7 +272,7 @@ String get_thermometers_addr() {
   int counter = sensor.getDeviceCount();
   for (i = 0; i < counter; i++) {
     data = data + String("\"") + String(getAddressString(insideThermometer[i])) + String("\" , ");
-    #Serial.println("Build  " + String(i) + " : " + String(getAddressString(insideThermometer[i])) + " "  + data);
+    //Serial.println("Build  " + String(i) + " : " + String(getAddressString(insideThermometer[i])) + " "  + data);
   }
   data = data + "]";
   return data;
@@ -256,6 +284,8 @@ String build_index() {
                   "'load_mode': '" + String(loadMode) + "'," +
                   "'load_status': '" + String(heaterStatus) + "'," +
                   "'disbaled_by_watch': '" + String(secure_disabled) + "'," +
+
+
                   "'max_temperature': '" + String(MAX_POSSIBLE_TMP) + "'," +
                   "'keep_temperature': '" + String((int)temperatureKeep) + "'," +
                   "'current_temperature': '" + String(printTemperatureToSerial()) + "'," +
@@ -273,8 +303,10 @@ String build_index() {
                   "'rssi': '" + WiFi.RSSI() + "'," +
                   "'sketch_size': '" + String(ESP.getSketchSize()) + "'," +
                   "'free_sketch_size': '" + String(ESP.getFreeSketchSpace()) + "'," +
+                  "'temperature_precision': '" + String(TEMPERATURE_PRECISION) + "'," +
                   "'dallas_addr': '" + getAddressString(insideThermometer[0]) + "'," +
                   "'dallas_addrs': '" + get_thermometers_addr() + "'," +
+                  "'outside_therm_index': '" + String(outsideThermometerIndex) + "'," +
                   "'time_str': '" + timeClient.getFormattedTime() + "'," +
                   "'time_epoch': '" + timeClient.getEpochTime() + "'," +
                   "'hostname': '" + WiFi.hostname() + "'" +
@@ -282,7 +314,7 @@ String build_index() {
   String ret = String("") + "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title>Load Info</title></head>" +
                " <script src='https://ajax.googleapis.com/ajax/libs/jquery/3.2.0/jquery.min.js'></script>\n" +
                " <script src='http://tm.anshamis.com/js/heater.js'></script>\n" +
-               " <link rel='stylesheet' type='text/css' href='http://tm.anshamis.com/css/boiler.css'>\n" +
+               " <link rel='stylesheet' type='text/css' href='http://tm.anshamis.com/css/heater.css'>\n" +
                "<body><script>" + ret_js + "</script>\n" +
                "<div id='content'></div>" +
                "<script>\n " +               "$(document).ready(function(){ onLoadPageLoad(); });</script>\n" +
@@ -319,6 +351,33 @@ void handleRoot() {
   //  message += server.client();
   String message = build_index();
   server.send(200, "text/html", message);
+}
+
+
+/***
+
+*/
+void saveOutsideThermometerIndex(int newIndex) {
+  save_setting("/outTmpIndex", String(newIndex));
+  outsideThermometerIndex = read_setting("/outTmpIndex").toInt();
+}
+
+/***
+
+*/
+void uploadAndSaveOutsideThermometerIndex() {
+  String message = "Saving uploadAndSaveOutsideThermometerIndex\n\n";
+  message += "URI: " + server.uri() + "\nMethod: ";
+  message += (server.method() == HTTP_GET) ? "GET" : "POST";
+  message += "\nArguments: ";
+  message += server.args() + "\n";
+  for (uint8_t i = 0; i < server.args(); i++) {
+    message += " " + server.argName(i) + ": " + server.arg(i) + "\n";
+    if (server.argName(i) == "outTmpIndex") {
+      saveOutsideThermometerIndex(server.arg(i).toInt());
+      Serial.println("saveOutsideThermometerIndex " + String(server.arg(i)));
+    }
+  }
 }
 
 /***
@@ -382,9 +441,9 @@ String getAddressString(DeviceAddress deviceAddress) {
 }
 
 /**
-   Enable Heater
+   Enable Load
 */
-void enableHeater() {
+void enableLoad() {
   float current_temp = getTemperature();
   if (current_temp > MAX_POSSIBLE_TMP) {
     Serial.println("ERROR: Current temperature is bigger of possible maximum. " + String(current_temp) + ">" + String(MAX_POSSIBLE_TMP));
@@ -397,9 +456,9 @@ void enableHeater() {
 }
 
 /**
-   Disable Heater
+   Disable Load
 */
-void disableHeater() {
+void disableLoad() {
   heaterStatus = 0;
   digitalWrite(HEATER_VCC, 0);
 }
