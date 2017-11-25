@@ -31,7 +31,7 @@ typedef enum {
 #define   NUMBER_OF_DEVICES         1
 #define   CS_PIN                    D3
 #define   TEMPERATURE_PRECISION     11
-
+#define   UART_BAUD_RATE            921600
 #define   NTP_SERVER                "europe.pool.ntp.org"
 #define   NTP_TIME_OFFSET_SEC       10800
 #define   NTP_UPDATE_INTERVAL_MS    60000
@@ -42,6 +42,7 @@ const int   sleepTimeS              = 10;  // Time to sleep (in seconds):
 int         counter                 = 0;
 bool        heaterStatus            = 0;
 float       MAX_POSSIBLE_TMP        = 26;
+float       MAX_POSSIBLE_TMP_INSIDE = 45;
 bool        secure_disabled         = false;
 float       temperatureKeep         = 22;
 float       current_temp            = -10;
@@ -86,7 +87,7 @@ void setup(void) {
   pinMode(HEATER_VCC, OUTPUT);
   disableLoad();
   sensor.begin();
-  Serial.begin(921600);
+  Serial.begin(UART_BAUD_RATE);
   Serial.println("");
   Serial.println("PASS: Serial communication started.");
   Serial.println("INFO: Starting SPIFFS...");
@@ -94,8 +95,7 @@ void setup(void) {
   Serial.println("PASS: SPIFFS startted.");
   //  Serial.println("INFO: Compile SPIFFS");
   //  SPIFFS.format();
-
-  WiFi.mode(WIFI_AP_STA);       //  Disable AP Mode
+  WiFi.mode(WIFI_STA);       //  Disable AP Mode - set mode to WIFI_AP, WIFI_STA, or WIFI_AP_STA. 
   WiFi.begin(ssid, password);
 
   // Wait for connection
@@ -177,8 +177,8 @@ void setup(void) {
   Serial.println("PASS: HTTP server started");
   //  save_setting("/ssid", ssid);
   //  save_setting("/password", password);
-  Serial.println(read_setting("/ssid"));
-  Serial.println(read_setting("/password"));
+  //  Serial.println(read_setting("/ssid"));
+  //  Serial.println(read_setting("/password"));
 
   String outsideThermometerIndexString = read_setting("/outTmpIndex");
   
@@ -241,13 +241,12 @@ void loop(void) {
     Serial.println("getFlashChipId: " + String(ESP.getFlashChipId()) + "\t\t getFlashChipSize: " + String(ESP.getFlashChipSize()));
     Serial.println("getFlashChipSpeed: " + String(ESP.getFlashChipSpeed()) + "\t getFlashChipMode: " + String(ESP.getFlashChipMode()));
     Serial.println("getSdkVersion: " + String(ESP.getSdkVersion()) + "\t getCoreVersion: " + ESP.getCoreVersion() + "\t\t getBootVersion: " + ESP.getBootVersion());
-    Serial.println("getBootMode: " + String(ESP.getBootMode()));
-    Serial.println("getCpuFreqMHz: " + String(ESP.getCpuFreqMHz()));
+    Serial.println("getCpuFreqMHz: " + String(ESP.getCpuFreqMHz()) + " \t getBootMode: " + String(ESP.getBootMode()));
     Serial.println("HostName :" + WiFi.hostname() + "\tmacAddress: " + WiFi.macAddress() + "\t Channel : " + String(WiFi.channel()) + "\t\t\t RSSI: " + WiFi.RSSI());
     Serial.println("getSketchSize: " + String(ESP.getSketchSize()) + "\t\t getFreeSketchSpace: " + String(ESP.getFreeSketchSpace()));
     //Serial.println("getResetReason: " + ESP.getResetReason());
     //Serial.println("getResetInfo: " + ESP.getResetInfo());
-    Serial.println("Address : " + getAddressString(insideThermometer[0]));
+    //Serial.println("Address : " + getAddressString(insideThermometer[0]));
   }
 
   if (WiFi.status() != WL_CONNECTED) {
@@ -284,11 +283,11 @@ String build_index() {
                   "'load_mode': '" + String(loadMode) + "'," +
                   "'load_status': '" + String(heaterStatus) + "'," +
                   "'disbaled_by_watch': '" + String(secure_disabled) + "'," +
-
-
                   "'max_temperature': '" + String(MAX_POSSIBLE_TMP) + "'," +
+                  "'max_temperature_inside': '" + String(MAX_POSSIBLE_TMP_INSIDE) + "'," +
                   "'keep_temperature': '" + String((int)temperatureKeep) + "'," +
-                  "'current_temperature': '" + String(printTemperatureToSerial()) + "'," +
+                  "'current_temperature': '" + String(getTemperature(outsideThermometerIndex)) + "'," +
+                  "'inside_temperature': '" + String(getTemperature(1-outsideThermometerIndex)) + "'," +  // TODO fix it 
                   "'flash_chip_id': '" + String(ESP.getFlashChipId()) + "'," +
                   "'flash_chip_size': '" + String(ESP.getFlashChipSize()) + "'," +
                   "'flash_chip_speed': '" + String(ESP.getFlashChipSpeed()) + "'," +
@@ -304,7 +303,7 @@ String build_index() {
                   "'sketch_size': '" + String(ESP.getSketchSize()) + "'," +
                   "'free_sketch_size': '" + String(ESP.getFreeSketchSpace()) + "'," +
                   "'temperature_precision': '" + String(TEMPERATURE_PRECISION) + "'," +
-                  "'dallas_addr': '" + getAddressString(insideThermometer[0]) + "'," +
+                  "'dallas_addr': '" + getAddressString(insideThermometer[outsideThermometerIndex]) + "'," +
                   "'dallas_addrs': '" + get_thermometers_addr() + "'," +
                   "'outside_therm_index': '" + String(outsideThermometerIndex) + "'," +
                   "'time_str': '" + timeClient.getFormattedTime() + "'," +
@@ -468,7 +467,7 @@ void disableLoad() {
    Get Temperature
 */
 float getTemperature(int dev/*=0*/) {
-  Serial.println("DEBUG: Requesting device " + String(dev));
+  //Serial.println("DEBUG: Requesting device " + String(dev));
   sensor.setWaitForConversion(false);  // makes it async
   sensor.requestTemperatures();
   sensor.setWaitForConversion(true);  // makes it async
