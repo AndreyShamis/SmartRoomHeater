@@ -35,6 +35,7 @@ typedef enum {
 #define   NTP_SERVER                "europe.pool.ntp.org"
 #define   NTP_TIME_OFFSET_SEC       10800
 #define   NTP_UPDATE_INTERVAL_MS    60000
+#define   LOOP_DELAY                50
 
 const char  *ssid                   = "RadiationG";
 const char  *password               = "polkalol";
@@ -42,10 +43,11 @@ const int   sleepTimeS              = 10;  // Time to sleep (in seconds):
 int         counter                 = 0;
 bool        heaterStatus            = 0;
 float       MAX_POSSIBLE_TMP        = 26;
-float       MAX_POSSIBLE_TMP_INSIDE = 45;
+float       MAX_POSSIBLE_TMP_INSIDE = 75;
 bool        secure_disabled         = false;
 float       temperatureKeep         = 22;
 float       current_temp            = -10;
+float       current_temp_inside     = -10;
 int         outsideThermometerIndex = 0;
 
 OneWire             oneWire(ONE_WIRE_BUS);
@@ -75,7 +77,7 @@ float   getTemperature(int dev = 0);
 String  printTemperatureToSerial();
 String  read_setting(const char* fname);
 void    save_setting(const char* fname, String value);
-
+int     getInsideThermometer();
 
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
@@ -95,7 +97,7 @@ void setup(void) {
   Serial.println("PASS: SPIFFS startted.");
   //  Serial.println("INFO: Compile SPIFFS");
   //  SPIFFS.format();
-  WiFi.mode(WIFI_STA);       //  Disable AP Mode - set mode to WIFI_AP, WIFI_STA, or WIFI_AP_STA. 
+  WiFi.mode(WIFI_STA);       //  Disable AP Mode - set mode to WIFI_AP, WIFI_STA, or WIFI_AP_STA.
   WiFi.begin(ssid, password);
 
   // Wait for connection
@@ -162,7 +164,7 @@ void setup(void) {
     loadMode = MANUAL;
     handleRoot();
   });
-  server.on("/setDallasIndex", [](){
+  server.on("/setDallasIndex", []() {
     uploadAndSaveOutsideThermometerIndex();
     handleRoot();
   });
@@ -181,11 +183,11 @@ void setup(void) {
   //  Serial.println(read_setting("/password"));
 
   String outsideThermometerIndexString = read_setting("/outTmpIndex");
-  
+
   if (outsideThermometerIndexString == "") {
     saveOutsideThermometerIndex(outsideThermometerIndex);
   }
-  else{
+  else {
     outsideThermometerIndex = outsideThermometerIndexString.toInt();
   }
 
@@ -198,6 +200,7 @@ void setup(void) {
 
 }
 
+
 /**
   ////////////////////////////////////////////////////////////////////////////
   ////////////////////////////////////////////////////////////////////////////
@@ -206,6 +209,7 @@ void loop(void) {
 
   server.handleClient();
   if (counter % 50 == 0) {
+    current_temp_inside = getTemperature(getInsideThermometer());
     current_temp = getTemperature(outsideThermometerIndex);
   }
   if (loadMode == KEEP && !heaterStatus) {
@@ -221,6 +225,12 @@ void loop(void) {
       disableLoad();
       secure_disabled = true;
     }
+    if (current_temp_inside > MAX_POSSIBLE_TMP_INSIDE) {
+      Serial.println("WARNING: Current temperature INSIDE is bigger of possible maximum. " + String(current_temp_inside) + ">" + String(MAX_POSSIBLE_TMP_INSIDE));
+      Serial.println("WARNING: Disabling Load");
+      disableLoad();
+      secure_disabled = true;
+    }
   }
 
   if (current_temp < 1) {
@@ -229,12 +239,17 @@ void loop(void) {
     disableLoad();
     secure_disabled = true;
   }
-
+  if (current_temp_inside < 1) {
+    Serial.println("WARNING: Very LOW temperatute INSIDE. " + String(current_temp_inside));
+    Serial.println("WARNING: Disabling Load");
+    disableLoad();
+    secure_disabled = true;
+  }
   if (counter > 1000) {
     counter = 0;
     printTemperatureToSerial();
   }
-  if (counter == 5) {
+  if (counter == 25) {
     timeClient.update();
     Serial.println("INFO: -----------------------------------------------------------------------");
     Serial.println("Heater status: " + String(heaterStatus));
@@ -250,17 +265,21 @@ void loop(void) {
   }
 
   if (WiFi.status() != WL_CONNECTED) {
+    if (heaterStatus) {
+      disableLoad();
+      secure_disabled = true;
+      Serial.println("WARNING: No WiFi Connection");
+      Serial.println("WARNING: Disabling Load");
+    }
     Serial.println("WIFI DISCONNECTED");
     delay(500);
   }
 
   //ESP.deepSleep(sleepTimeS * 1000000, RF_DEFAULT);
-  delay(100);
+  delay(LOOP_DELAY);
   counter++;
   if (counter % 200 == 0) {
-
-    Serial.println(timeClient.getFormattedTime());
-    //Serial.println(timeClient.getEpochTime());
+    Serial.println(timeClient.getFormattedTime()); //Serial.println(timeClient.getEpochTime());
   }
 
 }
@@ -287,7 +306,7 @@ String build_index() {
                   "'max_temperature_inside': '" + String(MAX_POSSIBLE_TMP_INSIDE) + "'," +
                   "'keep_temperature': '" + String((int)temperatureKeep) + "'," +
                   "'current_temperature': '" + String(getTemperature(outsideThermometerIndex)) + "'," +
-                  "'inside_temperature': '" + String(getTemperature(1-outsideThermometerIndex)) + "'," +  // TODO fix it 
+                  "'inside_temperature': '" + String(getTemperature(getInsideThermometer())) + "'," + 
                   "'flash_chip_id': '" + String(ESP.getFlashChipId()) + "'," +
                   "'flash_chip_size': '" + String(ESP.getFlashChipSize()) + "'," +
                   "'flash_chip_speed': '" + String(ESP.getFlashChipSpeed()) + "'," +
@@ -319,6 +338,13 @@ String build_index() {
                "<script>\n " +               "$(document).ready(function(){ onLoadPageLoad(); });</script>\n" +
                "</body></html>";
   return ret;
+}
+
+/**
+ * 
+ */
+int getInsideThermometer(){
+  return (1 - outsideThermometerIndex); // TODO fix it
 }
 
 /**
@@ -443,7 +469,7 @@ String getAddressString(DeviceAddress deviceAddress) {
    Enable Load
 */
 void enableLoad() {
-  float current_temp = getTemperature();
+  float current_temp = getTemperature(outsideThermometerIndex);
   if (current_temp > MAX_POSSIBLE_TMP) {
     Serial.println("ERROR: Current temperature is bigger of possible maximum. " + String(current_temp) + ">" + String(MAX_POSSIBLE_TMP));
   }
