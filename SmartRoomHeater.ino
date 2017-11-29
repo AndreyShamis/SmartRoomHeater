@@ -1,3 +1,19 @@
+/**
+ * This code provide ability to controll Load with Solid State Relay SSR
+ * In Smart Heater project used:
+ *
+ *      2 * DS1822+   https://datasheets.maximintegrated.com/en/ds/DS1822.pdf  9-12bit  -55-125
+ *      1 * NodeMCU
+ *      1 * Solid state Relay FOTEK SSR-25 DA
+ *      1 * 220v to 5v USB PS
+ *
+ *  Production Relaease 29.11.2017
+ *
+ *  Author: Andrey Shamis lolnik@gmail.com
+ *  
+ *
+ */
+
 //deep sleep include
 extern "C" {
 #include "ets_sys.h"
@@ -18,14 +34,9 @@ extern "C" {
 #include "FS.h"
 #include <OneWire.h>
 #include <DallasTemperature.h>
-
-typedef enum {
-  UNDEF   = 0,  //  UNKNOWN
-  MANUAL  = 1,  //  Controlled by USER - manual diable, manual enable, secured by MAX_TMP
-  AUTO    = 2,  //  Controlled by TIME, secured by MAX_TMP
-  KEEP    = 3,  //  Controlled by BOARD, keep temperature between MAX_TMP <> TRASHHOLD_TMP, secured by MAX_TMP
-} LoadModeType;
-
+/**
+ ****************************************************************************************************
+ */
 #define   ONE_WIRE_BUS              D4 //D4 2
 #define   HEATER_VCC                D7 //D7 13
 #define   NUMBER_OF_DEVICES         1
@@ -37,10 +48,30 @@ typedef enum {
 #define   NTP_UPDATE_INTERVAL_MS    60000
 #define   LOOP_DELAY                10
 #define   CHECK_TMP_INSIDE          1
-
+/**
+ ****************************************************************************************************
+ */
+typedef enum {
+  UNDEF   = 0,  //  UNKNOWN
+  MANUAL  = 1,  //  Controlled by USER - manual diable, manual enable, secured by MAX_TMP
+  AUTO    = 2,  //  Controlled by TIME, secured by MAX_TMP
+  KEEP    = 3,  //  Controlled by BOARD, keep temperature between MAX_TMP <> TRASHHOLD_TMP, secured by MAX_TMP
+} LoadModeType;
+/**
+ ****************************************************************************************************
+ */
+//const int   sleepTimeS              = 10;  // Time to sleep (in seconds):
+//enum ADCMode {
+//    ADC_TOUT = 33,
+//    ADC_TOUT_3V3 = 33,
+//    ADC_VCC = 255,
+//    ADC_VDD = 255
+//};
+/**
+ ****************************************************************************************************
+ */
 const char  *ssid                   = "RadiationG";
 const char  *password               = "polkalol";
-const int   sleepTimeS              = 10;  // Time to sleep (in seconds):
 int         counter                 = 0;
 bool        heaterStatus            = 0;
 float       MAX_POSSIBLE_TMP        = 26;
@@ -50,27 +81,27 @@ float       temperatureKeep         = 22;
 float       current_temp            = -10;
 float       current_temp_inside     = -10;
 int         outsideThermometerIndex = 0;
-
+/**
+ ****************************************************************************************************
+ */
 OneWire             oneWire(ONE_WIRE_BUS);
 DallasTemperature   sensor(&oneWire);
 ESP8266WebServer    server(80);
 DeviceAddress       insideThermometer[2]; // arrays to hold device address
 WiFiUDP ntpUDP;
 
-
-// You can specify the time server pool and the offset (in seconds, can be
-// changed later with setTimeOffset() ). Additionaly you can specify the
-// update interval (in milliseconds, can be changed using setUpdateInterval() ).
+/** 
+ *  You can specify the time server pool and the offset (in seconds, can be changed later with setTimeOffset()).
+ *  Additionaly you can specify the update interval (in milliseconds, can be changed using setUpdateInterval()).
+ */
 NTPClient timeClient(ntpUDP, NTP_SERVER, NTP_TIME_OFFSET_SEC, NTP_UPDATE_INTERVAL_MS);
 
 LoadModeType loadMode = MANUAL;
-//enum ADCMode {
-//    ADC_TOUT = 33,
-//    ADC_TOUT_3V3 = 33,
-//    ADC_VCC = 255,
-//    ADC_VDD = 255
-//};
+
 ADC_MODE(ADC_VCC);
+/**
+ ****************************************************************************************************
+ */
 String  getAddressString(DeviceAddress deviceAddress);
 void    disableLoad();
 void    enableLoad();
@@ -79,11 +110,12 @@ String  printTemperatureToSerial();
 String  read_setting(const char* fname);
 void    save_setting(const char* fname, String value);
 int     getInsideThermometer();
-
-////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////
 /**
-
+ ****************************************************************************************************
+ */
+ 
+/**
+  Setup the controller
 */
 void setup(void) {
   //ADC_MODE(ADC_VCC);
@@ -146,12 +178,6 @@ void setup(void) {
     }
   }
 
-  //  if (!sensor.getAddress(insideThermometer[1], 0)) {
-  //    Serial.println("Unable to find address for Device 0");
-  //  }
-  //  sensor.setResolution(insideThermometer[0], 11);;
-  //  sensor.setResolution(insideThermometer[1], 11);
-
   server.on("/", handleRoot);
   server.on("/inline", []() {
     server.send(200, "text/plain", "this works as well");
@@ -186,10 +212,6 @@ void setup(void) {
   else{
     Serial.println("WARNING: CHECK_TMP_INSIDE = False, check of internal thermometer will be disabled!");
   }
-  //  save_setting("/ssid", ssid);
-  //  save_setting("/password", password);
-  //  Serial.println(read_setting("/ssid"));
-  //  Serial.println(read_setting("/password"));
 
   String outsideThermometerIndexString = read_setting("/outTmpIndex");
 
@@ -200,18 +222,13 @@ void setup(void) {
     outsideThermometerIndex = outsideThermometerIndexString.toInt();
   }
 
-  // Sleep
-  //Serial.println("ESP8266 in sleep mode");
-  //ESP.deepSleep(sleepTimeS * 1000000, RF_DEFAULT);
-
-  //delay(250);
   timeClient.update();
 
 }
 
 
 /**
-  ////////////////////////////////////////////////////////////////////////////
+  /////////////////////// L O O P   F U N C T I O N //////////////////////////
   ////////////////////////////////////////////////////////////////////////////
 */
 void loop(void) {
@@ -254,7 +271,7 @@ void loop(void) {
     disableLoad();
     secure_disabled = true;
   }
-  if (counter > 6000) {
+  if (counter >= 120000) {
     counter = 0;
     //printTemperatureToSerial();
   }
@@ -290,25 +307,14 @@ void loop(void) {
   counter++;
 }
 
-/**
- * 
- */
-String get_thermometers_addr() {
-  String data = "[";
-  int i = 0;
-  int counter = sensor.getDeviceCount();
-  for (i = 0; i < counter; i++) {
-    data = data + String("\"") + String(getAddressString(insideThermometer[i])) + String("\" , ");
-    //Serial.println("Build  " + String(i) + " : " + String(getAddressString(insideThermometer[i])) + " "  + data);
-  }
-  data = data + "]";
-  return data;
-}
+
 
 /**
  * 
  */
 String build_index() {
+                  //"'current_temperature': '" + String(getTemperature(outsideThermometerIndex)) + "'," +
+                  //"'inside_temperature': '" + String(getTemperature(getInsideThermometer())) + "'," + 
   String ret_js = String("") + "load = \n{" +
                   "'boiler_mode': '" + String(loadMode) + "'," +
                   "'load_mode': '" + String(loadMode) + "'," +
@@ -317,8 +323,8 @@ String build_index() {
                   "'max_temperature': '" + String(MAX_POSSIBLE_TMP) + "'," +
                   "'max_temperature_inside': '" + String(MAX_POSSIBLE_TMP_INSIDE) + "'," +
                   "'keep_temperature': '" + String(temperatureKeep) + "'," +
-                  "'current_temperature': '" + String(getTemperature(outsideThermometerIndex)) + "'," +
-                  "'inside_temperature': '" + String(getTemperature(getInsideThermometer())) + "'," + 
+                  "'current_temperature': '" + String(current_temp) + "'," +
+                  "'inside_temperature': '" + String(current_temp_inside) + "'," + 
                   "'flash_chip_id': '" + String(ESP.getFlashChipId()) + "'," +
                   "'flash_chip_size': '" + String(ESP.getFlashChipSize()) + "'," +
                   "'flash_chip_speed': '" + String(ESP.getFlashChipSpeed()) + "'," +
@@ -359,38 +365,6 @@ int getInsideThermometer(){
   return (1 - outsideThermometerIndex); // TODO fix it
 }
 
-/**
-
-*/
-String build_device_info() {
-  String ret = "<pre>\t\t\t Heater status: " + String(heaterStatus);
-  ret += "\ngetFlashChipId: " + String(ESP.getFlashChipId()) + "\t\t getFlashChipSize: " + String(ESP.getFlashChipSize());
-  ret += "\ngetFlashChipSpeed: " + String(ESP.getFlashChipSpeed()) + "\t getFlashChipMode: " + String(ESP.getFlashChipMode());
-  ret += "\ngetSdkVersion: " + String(ESP.getSdkVersion()) + "\t getCoreVersion: " + ESP.getCoreVersion() + "\t\t getBootVersion: " + ESP.getBootVersion();
-  ret += "\ngetBootMode: " + String(ESP.getBootMode());
-  ret += "\ngetCpuFreqMHz: " + String(ESP.getCpuFreqMHz());
-  ret += "\nmacAddress: " + WiFi.macAddress() + "\t Channel : " + String(WiFi.channel()) + "\t\t\t RSSI: " + WiFi.RSSI();
-  ret += "\ngetSketchSize: " + String(ESP.getSketchSize()) + "\t\t getFreeSketchSpace: " + String(ESP.getFreeSketchSpace());
-  //ret += "\ngetResetReason: " + ESP.getResetReason();
-  //ret += "\ngetResetInfo: " + ESP.getResetInfo();
-  ret += "\nAddress : " + getAddressString(insideThermometer[0]) + "</pre>";
-  return ret;
-}
-
-/**
-
-*/
-void handleRoot() {
-
-  //  for (uint8_t i=0; i<server.args(); i++){
-  //    message += " " + server.argName(i) + ": " + server.arg(i) + "\n";
-  //  }
-  //  message += server.client();
-  String message = build_index();
-  server.send(200, "text/html", message);
-}
-
-
 /***
 
 */
@@ -399,83 +373,20 @@ void saveOutsideThermometerIndex(int newIndex) {
   outsideThermometerIndex = read_setting("/outTmpIndex").toInt();
 }
 
-/***
-
-*/
-void uploadAndSaveOutsideThermometerIndex() {
-  String message = "Saving uploadAndSaveOutsideThermometerIndex\n\n";
-  message += "URI: " + server.uri() + "\nMethod: ";
-  message += (server.method() == HTTP_GET) ? "GET" : "POST";
-  message += "\nArguments: ";
-  message += server.args() + "\n";
-  for (uint8_t i = 0; i < server.args(); i++) {
-    message += " " + server.argName(i) + ": " + server.arg(i) + "\n";
-    if (server.argName(i) == "outTmpIndex") {
-      saveOutsideThermometerIndex(server.arg(i).toInt());
-      Serial.println("saveOutsideThermometerIndex " + String(server.arg(i)));
-    }
-  }
-}
-
-/***
-
-*/
-void saveLoadMode() {
-  String message = "Saving Load Mode\n\n";
-  message += "URI: " + server.uri() + "\nMethod: ";
-  message += (server.method() == HTTP_GET) ? "GET" : "POST";
-  message += "\nArguments: ";
-  message += server.args() + "\n";
-  for (uint8_t i = 0; i < server.args(); i++) {
-    message += " " + server.argName(i) + ": " + server.arg(i) + "\n";
-    if (server.argName(i) == "temperatureKeep") {
-      temperatureKeep = server.arg(i).toFloat();
-      loadMode = KEEP;
-      Serial.println("Keep temperature " + String(temperatureKeep));
-      if (temperatureKeep > MAX_POSSIBLE_TMP) {
-        temperatureKeep = MAX_POSSIBLE_TMP;
-        Serial.println("Override Keep temperature to MAX_POSSIBLE_TMP " + String(temperatureKeep));
-      }
-    }
-  }
-}
-
 /**
-
+   Get Temperature
 */
-void handleNotFound() {
-  String message = "File Not Found\n\n";
-  message += "URI: " + server.uri() + "\nMethod: ";
-  message += (server.method() == HTTP_GET) ? "GET" : "POST";
-  message += "\nArguments: ";
-  message += server.args() + "\n";
-  for (uint8_t i = 0; i < server.args(); i++) {
-    message += " " + server.argName(i) + ": " + server.arg(i) + "\n";
-  }
-  server.send(404, "text/plain", message);
+float getTemperature(int dev/*=0*/) {
+  //Serial.println("DEBUG: Requesting device " + String(dev));
+  sensor.setWaitForConversion(false);  // makes it async
+  sensor.requestTemperatures();
+  sensor.setWaitForConversion(true);  // makes it async
+  return sensor.getTempCByIndex(dev);
+  //return sensor.getTempC(insideThermometer[dev]);
 }
 
-
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////
-/**
-
-*/
-String getAddressString(DeviceAddress deviceAddress) {
-  String ret = "";
-  for (uint8_t i = 0; i < 8; i++) {
-    if (deviceAddress[i] < 16) {
-      ret += "0";
-    }
-    ret += String(deviceAddress[i], HEX);
-    if (i < 7) {
-      ret += ":";
-    }
-  }
-  return ret;
-}
 
 /**
    Enable Load
@@ -500,17 +411,97 @@ void disableLoad() {
   digitalWrite(HEATER_VCC, 0);
 }
 
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+
+/***
+  WEB Server function
+*/
+void uploadAndSaveOutsideThermometerIndex() {
+  String message = "Saving uploadAndSaveOutsideThermometerIndex\n\n";
+  message += "URI: " + server.uri() + "\nMethod: ";
+  message += (server.method() == HTTP_GET) ? "GET" : "POST";
+  message += "\nArguments: ";
+  message += server.args() + "\n";
+  for (uint8_t i = 0; i < server.args(); i++) {
+    message += " " + server.argName(i) + ": " + server.arg(i) + "\n";
+    if (server.argName(i) == "outTmpIndex") {
+      saveOutsideThermometerIndex(server.arg(i).toInt());
+      Serial.println("saveOutsideThermometerIndex " + String(server.arg(i)));
+    }
+  }
+}
+
+/***
+  WEB Server function
+*/
+void saveLoadMode() {
+  String message = "Saving Load Mode\n\n";
+  message += "URI: " + server.uri() + "\nMethod: ";
+  message += (server.method() == HTTP_GET) ? "GET" : "POST";
+  message += "\nArguments: ";
+  message += server.args() + "\n";
+  for (uint8_t i = 0; i < server.args(); i++) {
+    message += " " + server.argName(i) + ": " + server.arg(i) + "\n";
+    if (server.argName(i) == "temperatureKeep") {
+      temperatureKeep = server.arg(i).toFloat();
+      loadMode = KEEP;
+      Serial.println("Keep temperature " + String(temperatureKeep));
+      if (temperatureKeep > MAX_POSSIBLE_TMP) {
+        temperatureKeep = MAX_POSSIBLE_TMP;
+        Serial.println("Override Keep temperature to MAX_POSSIBLE_TMP " + String(temperatureKeep));
+      }
+    }
+  }
+}
 
 /**
-   Get Temperature
+  WEB Server function
 */
-float getTemperature(int dev/*=0*/) {
-  //Serial.println("DEBUG: Requesting device " + String(dev));
-  sensor.setWaitForConversion(false);  // makes it async
-  sensor.requestTemperatures();
-  sensor.setWaitForConversion(true);  // makes it async
-  return sensor.getTempCByIndex(dev);
-  //return sensor.getTempC(insideThermometer[dev]);
+void handleNotFound() {
+  String message = "File Not Found\n\n";
+  message += "URI: " + server.uri() + "\nMethod: ";
+  message += (server.method() == HTTP_GET) ? "GET" : "POST";
+  message += "\nArguments: ";
+  message += server.args() + "\n";
+  for (uint8_t i = 0; i < server.args(); i++) {
+    message += " " + server.argName(i) + ": " + server.arg(i) + "\n";
+  }
+  server.send(404, "text/plain", message);
+}
+
+/**
+  WEB Server function
+*/
+void handleRoot() {
+
+  //  for (uint8_t i=0; i<server.args(); i++){
+  //    message += " " + server.argName(i) + ": " + server.arg(i) + "\n";
+  //  }
+  //  message += server.client();
+  String message = build_index();
+  server.send(200, "text/html", message);
+}
+
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+
+/**
+
+*/
+String build_device_info() {
+  String ret = "<pre>\t\t\t Heater status: " + String(heaterStatus);
+  ret += "\ngetFlashChipId: " + String(ESP.getFlashChipId()) + "\t\t getFlashChipSize: " + String(ESP.getFlashChipSize());
+  ret += "\ngetFlashChipSpeed: " + String(ESP.getFlashChipSpeed()) + "\t getFlashChipMode: " + String(ESP.getFlashChipMode());
+  ret += "\ngetSdkVersion: " + String(ESP.getSdkVersion()) + "\t getCoreVersion: " + ESP.getCoreVersion() + "\t\t getBootVersion: " + ESP.getBootVersion();
+  ret += "\ngetBootMode: " + String(ESP.getBootMode());
+  ret += "\ngetCpuFreqMHz: " + String(ESP.getCpuFreqMHz());
+  ret += "\nmacAddress: " + WiFi.macAddress() + "\t Channel : " + String(WiFi.channel()) + "\t\t\t RSSI: " + WiFi.RSSI();
+  ret += "\ngetSketchSize: " + String(ESP.getSketchSize()) + "\t\t getFreeSketchSpace: " + String(ESP.getFreeSketchSpace());
+  //ret += "\ngetResetReason: " + ESP.getResetReason();
+  //ret += "\ngetResetInfo: " + ESP.getResetInfo();
+  ret += "\nAddress : " + getAddressString(insideThermometer[0]) + "</pre>";
+  return ret;
 }
 
 /**
@@ -526,9 +517,44 @@ String printTemperatureToSerial() {
   return String(current_temp);
 }
 
+/**
+ * 
+ */
+String get_thermometers_addr() {
+  String data = "[";
+  int i = 0;
+  int counter = sensor.getDeviceCount();
+  for (i = 0; i < counter; i++) {
+    data = data + String("\"") + String(getAddressString(insideThermometer[i])) + String("\" , ");
+    //Serial.println("Build  " + String(i) + " : " + String(getAddressString(insideThermometer[i])) + " "  + data);
+  }
+  data = data + "]";
+  return data;
+}
 
 /**
+  Convert Dallas Address to String
+*/
+String getAddressString(DeviceAddress deviceAddress) {
+  String ret = "";
+  uint8_t i;
+  for (i = 0; i < 8; i++) {
+    if (deviceAddress[i] < 16) {
+      ret += "0";
+    }
+    ret += String(deviceAddress[i], HEX);
+    if (i < 7) {
+      ret += ":";
+    }
+  }
+  return ret;
+}
 
+////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////
+
+/**
+  Write to file content on SPIFFS
 */
 void save_setting(const char* fname, String value) {
   File f = SPIFFS.open(fname, "w");
@@ -544,7 +570,7 @@ void save_setting(const char* fname, String value) {
 }
 
 /**
-
+  Read file content from SPIFFS
 */
 String read_setting(const char* fname) {
   String s      = "";
@@ -559,3 +585,4 @@ String read_setting(const char* fname) {
   }
   return s;
 }
+
