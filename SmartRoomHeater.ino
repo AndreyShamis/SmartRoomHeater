@@ -30,12 +30,13 @@ typedef enum {
 #define   HEATER_VCC                D7 //D7 13
 #define   NUMBER_OF_DEVICES         1
 #define   CS_PIN                    D3
-#define   TEMPERATURE_PRECISION     11
+#define   TEMPERATURE_PRECISION     11      // Possible value 9-12
 #define   UART_BAUD_RATE            921600
 #define   NTP_SERVER                "europe.pool.ntp.org"
 #define   NTP_TIME_OFFSET_SEC       10800
 #define   NTP_UPDATE_INTERVAL_MS    60000
 #define   LOOP_DELAY                50
+#define   CHECK_TMP_INSIDE          1
 
 const char  *ssid                   = "RadiationG";
 const char  *password               = "polkalol";
@@ -101,20 +102,20 @@ void setup(void) {
   WiFi.begin(ssid, password);
 
   // Wait for connection
-  Serial.print("INFO: Connecting to ");
-  Serial.print(ssid);
-  Serial.print(password);
-  Serial.println("...");
+  Serial.println("INFO: Connecting to [" + String(ssid)+ "]["+String(password)+"]...");
+  int con_counter = 0;
   while (WiFi.status() != WL_CONNECTED) {
-    delay(250);
+    delay(100);
     Serial.print(".");
+    con_counter++;
+    if(con_counter % 20 == 0){
+      Serial.println("");
+      Serial.println("WARNING: Still connecting...");
+    }
   }
   Serial.println("");
-  Serial.print("PASS: Connected to ");
-  Serial.println(ssid);
-  Serial.print("PASS:  IP address: ");
+  Serial.print("PASS: Connected to [" + String(ssid) + "]  IP address: ");
   Serial.println(WiFi.localIP());
-
   if (MDNS.begin("esp8266")) {
     Serial.println("PASS: MDNS responder started");
   }
@@ -123,13 +124,14 @@ void setup(void) {
 
   Serial.print("INFO: Found ");
   Serial.print(sensor.getDeviceCount(), DEC);
-  Serial.println(" devices.");
-  Serial.print("Parasite power is: ");
+  Serial.println(" Thermometer Dallas devices.");
+  
+  Serial.print("INFO: Parasite power is: ");
   if (sensor.isParasitePowerMode()) {
-    Serial.println("INFO: isParasitePowerMode ON");
+    Serial.println("isParasitePowerMode ON");
   }
   else {
-    Serial.println("INFO: isParasitePowerMode OFF");
+    Serial.println("isParasitePowerMode OFF");
   }
   for (int i = 0; i < sensor.getDeviceCount(); i++) {
     if (!sensor.getAddress(insideThermometer[i], i)) {
@@ -177,6 +179,13 @@ void setup(void) {
   Serial.println("INFO: Staring HTTP server...");
   server.begin();
   Serial.println("PASS: HTTP server started");
+
+  if(CHECK_TMP_INSIDE){
+    Serial.println("INFO: CHECK_TMP_INSIDE = True ");
+  }
+  else{
+    Serial.println("WARNING: CHECK_TMP_INSIDE = False, check of internal thermometer will be disabled!");
+  }
   //  save_setting("/ssid", ssid);
   //  save_setting("/password", password);
   //  Serial.println(read_setting("/ssid"));
@@ -225,7 +234,7 @@ void loop(void) {
       disableLoad();
       secure_disabled = true;
     }
-    if (current_temp_inside > MAX_POSSIBLE_TMP_INSIDE) {
+    if (CHECK_TMP_INSIDE && current_temp_inside > MAX_POSSIBLE_TMP_INSIDE) {
       Serial.println("WARNING: Current temperature INSIDE is bigger of possible maximum. " + String(current_temp_inside) + ">" + String(MAX_POSSIBLE_TMP_INSIDE));
       Serial.println("WARNING: Disabling Load");
       disableLoad();
@@ -239,7 +248,7 @@ void loop(void) {
     disableLoad();
     secure_disabled = true;
   }
-  if (current_temp_inside < 1) {
+  if (CHECK_TMP_INSIDE && current_temp_inside < 1) {
     Serial.println("WARNING: Very LOW temperatute INSIDE. " + String(current_temp_inside));
     Serial.println("WARNING: Disabling Load");
     disableLoad();
@@ -304,7 +313,7 @@ String build_index() {
                   "'disbaled_by_watch': '" + String(secure_disabled) + "'," +
                   "'max_temperature': '" + String(MAX_POSSIBLE_TMP) + "'," +
                   "'max_temperature_inside': '" + String(MAX_POSSIBLE_TMP_INSIDE) + "'," +
-                  "'keep_temperature': '" + String((int)temperatureKeep) + "'," +
+                  "'keep_temperature': '" + String(temperatureKeep) + "'," +
                   "'current_temperature': '" + String(getTemperature(outsideThermometerIndex)) + "'," +
                   "'inside_temperature': '" + String(getTemperature(getInsideThermometer())) + "'," + 
                   "'flash_chip_id': '" + String(ESP.getFlashChipId()) + "'," +
