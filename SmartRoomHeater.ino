@@ -30,12 +30,12 @@ typedef enum {
 #define   HEATER_VCC                D7 //D7 13
 #define   NUMBER_OF_DEVICES         1
 #define   CS_PIN                    D3
-#define   TEMPERATURE_PRECISION     11      // Possible value 9-12
+#define   TEMPERATURE_PRECISION     12      // Possible value 9-12
 #define   UART_BAUD_RATE            921600
 #define   NTP_SERVER                "europe.pool.ntp.org"
 #define   NTP_TIME_OFFSET_SEC       10800
 #define   NTP_UPDATE_INTERVAL_MS    60000
-#define   LOOP_DELAY                50
+#define   LOOP_DELAY                10
 #define   CHECK_TMP_INSIDE          1
 
 const char  *ssid                   = "RadiationG";
@@ -222,7 +222,7 @@ void loop(void) {
     current_temp = getTemperature(outsideThermometerIndex);
   }
   if (loadMode == KEEP && !heaterStatus) {
-    if (current_temp < temperatureKeep &&  current_temp < MAX_POSSIBLE_TMP && current_temp > 0) {
+    if (current_temp < _min(temperatureKeep,MAX_POSSIBLE_TMP) && current_temp > 0) {
       Serial.println("WARNING: Keep enabled, enable load");
       enableLoad();
     }
@@ -254,12 +254,13 @@ void loop(void) {
     disableLoad();
     secure_disabled = true;
   }
-  if (counter > 1000) {
+  if (counter > 6000) {
     counter = 0;
-    printTemperatureToSerial();
+    //printTemperatureToSerial();
   }
   if (counter == 25) {
     timeClient.update();
+    Serial.println(timeClient.getFormattedTime()); //Serial.println(timeClient.getEpochTime());
     Serial.println("INFO: -----------------------------------------------------------------------");
     Serial.println("Heater status: " + String(heaterStatus));
     Serial.println("getFlashChipId: " + String(ESP.getFlashChipId()) + "\t\t getFlashChipSize: " + String(ESP.getFlashChipSize()));
@@ -281,18 +282,17 @@ void loop(void) {
       Serial.println("WARNING: Disabling Load");
     }
     Serial.println("WIFI DISCONNECTED");
-    delay(500);
+    delay(200);
   }
 
   //ESP.deepSleep(sleepTimeS * 1000000, RF_DEFAULT);
   delay(LOOP_DELAY);
   counter++;
-  if (counter % 200 == 0) {
-    Serial.println(timeClient.getFormattedTime()); //Serial.println(timeClient.getEpochTime());
-  }
-
 }
 
+/**
+ * 
+ */
 String get_thermometers_addr() {
   String data = "[";
   int i = 0;
@@ -305,6 +305,9 @@ String get_thermometers_addr() {
   return data;
 }
 
+/**
+ * 
+ */
 String build_index() {
   String ret_js = String("") + "load = \n{" +
                   "'boiler_mode': '" + String(loadMode) + "'," +
