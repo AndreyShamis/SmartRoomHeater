@@ -1,18 +1,18 @@
 /**
- * This code provide ability to controll Load with Solid State Relay SSR
- * In Smart Heater project used:
- *
- *      2 * DS1822+   https://datasheets.maximintegrated.com/en/ds/DS1822.pdf  9-12bit  -55-125
- *      1 * NodeMCU
- *      1 * Solid state Relay FOTEK SSR-25 DA
- *      1 * 220v to 5v USB PS
- *
- *  Production Relaease 29.11.2017
- *
- *  Author: Andrey Shamis lolnik@gmail.com
- *  
- *
- */
+   This code provide ability to controll Load with Solid State Relay SSR
+   In Smart Heater project used:
+
+        2 * DS1822+   https://datasheets.maximintegrated.com/en/ds/DS1822.pdf  9-12bit  -55-125
+        1 * NodeMCU
+        1 * Solid state Relay FOTEK SSR-25 DA
+        1 * 220v to 5v USB PS
+
+    Production Relaease 29.11.2017
+
+    Author: Andrey Shamis lolnik@gmail.com
+
+
+*/
 
 //deep sleep include
 extern "C" {
@@ -36,9 +36,9 @@ extern "C" {
 #include <DallasTemperature.h>
 /**
  ****************************************************************************************************
- */
+*/
 #define   ONE_WIRE_BUS              D4 //D4 2
-#define   HEATER_VCC                D7 //D7 13
+#define   LOAD_VCC                  D7 //D7 13
 #define   NUMBER_OF_DEVICES         1
 #define   CS_PIN                    D3
 #define   TEMPERATURE_PRECISION     12      // Possible value 9-12
@@ -48,9 +48,19 @@ extern "C" {
 #define   NTP_UPDATE_INTERVAL_MS    60000
 #define   LOOP_DELAY                10
 #define   CHECK_TMP_INSIDE          1
+#define   OFF_ON_DELAY_MS           60
+
+/**
+   shows counter values identical to one second
+   For example loop_delay=10, counter sec will be 100 , when (counter%100 == 0) happens every second
+*/
+#define COUNTER_IN_LOOP_SECOND              (int)(1000/LOOP_DELAY)
+#define CHECK_OUTSIDE_TMP_COUNTER           (int)(COUNTER_IN_LOOP_SECOND*4)
+#define CHECK_OUTSIDE_INTERNAL_COUNTER      (CHECK_OUTSIDE_TMP_COUNTER*2)
+
 /**
  ****************************************************************************************************
- */
+*/
 typedef enum {
   UNDEF   = 0,  //  UNKNOWN
   MANUAL  = 1,  //  Controlled by USER - manual diable, manual enable, secured by MAX_TMP
@@ -59,7 +69,7 @@ typedef enum {
 } LoadModeType;
 /**
  ****************************************************************************************************
- */
+*/
 //const int   sleepTimeS              = 10;  // Time to sleep (in seconds):
 //enum ADCMode {
 //    ADC_TOUT = 33,
@@ -69,31 +79,33 @@ typedef enum {
 //};
 /**
  ****************************************************************************************************
- */
+*/
 const char  *ssid                   = "RadiationG";
 const char  *password               = "polkalol";
 int         counter                 = 0;
 bool        heaterStatus            = 0;
+float       OUTSIDE_TMP_TRASH_HOLD  = 0.09;
 float       MAX_POSSIBLE_TMP        = 26;
-float       MAX_POSSIBLE_TMP_INSIDE = 75;
+float       MAX_POSSIBLE_TMP_INSIDE = 40;
 bool        secure_disabled         = false;
 float       temperatureKeep         = 22;
 float       current_temp            = -10;
 float       current_temp_inside     = -10;
 int         outsideThermometerIndex = 0;
+int         last_disable_epoch      = 0;
 /**
  ****************************************************************************************************
- */
+*/
 OneWire             oneWire(ONE_WIRE_BUS);
 DallasTemperature   sensor(&oneWire);
 ESP8266WebServer    server(80);
 DeviceAddress       insideThermometer[2]; // arrays to hold device address
 WiFiUDP ntpUDP;
 
-/** 
- *  You can specify the time server pool and the offset (in seconds, can be changed later with setTimeOffset()).
- *  Additionaly you can specify the update interval (in milliseconds, can be changed using setUpdateInterval()).
- */
+/**
+    You can specify the time server pool and the offset (in seconds, can be changed later with setTimeOffset()).
+    Additionaly you can specify the update interval (in milliseconds, can be changed using setUpdateInterval()).
+*/
 NTPClient timeClient(ntpUDP, NTP_SERVER, NTP_TIME_OFFSET_SEC, NTP_UPDATE_INTERVAL_MS);
 
 LoadModeType loadMode = MANUAL;
@@ -101,7 +113,7 @@ LoadModeType loadMode = MANUAL;
 ADC_MODE(ADC_VCC);
 /**
  ****************************************************************************************************
- */
+*/
 String  getAddressString(DeviceAddress deviceAddress);
 void    disableLoad();
 void    enableLoad();
@@ -112,14 +124,14 @@ void    save_setting(const char* fname, String value);
 int     getInsideThermometer();
 /**
  ****************************************************************************************************
- */
- 
+*/
+
 /**
   Setup the controller
 */
 void setup(void) {
   //ADC_MODE(ADC_VCC);
-  pinMode(HEATER_VCC, OUTPUT);
+  pinMode(LOAD_VCC, OUTPUT);
   disableLoad();
   sensor.begin();
   Serial.begin(UART_BAUD_RATE);
@@ -134,13 +146,13 @@ void setup(void) {
   WiFi.begin(ssid, password);
 
   // Wait for connection
-  Serial.println("INFO: Connecting to [" + String(ssid)+ "]["+String(password)+"]...");
+  Serial.println("INFO: Connecting to [" + String(ssid) + "][" + String(password) + "]...");
   int con_counter = 0;
   while (WiFi.status() != WL_CONNECTED) {
     delay(100);
     Serial.print(".");
     con_counter++;
-    if(con_counter % 20 == 0){
+    if (con_counter % 20 == 0) {
       Serial.println("");
       Serial.println("WARNING: Still connecting...");
     }
@@ -157,7 +169,7 @@ void setup(void) {
   Serial.print("INFO: Found ");
   Serial.print(sensor.getDeviceCount(), DEC);
   Serial.println(" Thermometer Dallas devices.");
-  
+
   Serial.print("INFO: Parasite power is: ");
   if (sensor.isParasitePowerMode()) {
     Serial.println("isParasitePowerMode ON");
@@ -197,6 +209,7 @@ void setup(void) {
     handleRoot();
   });
   server.on("/keep", []() {
+    last_disable_epoch = 0;
     saveLoadMode();
     handleRoot();
   });
@@ -206,10 +219,10 @@ void setup(void) {
   server.begin();
   Serial.println("PASS: HTTP server started");
 
-  if(CHECK_TMP_INSIDE){
+  if (CHECK_TMP_INSIDE) {
     Serial.println("INFO: CHECK_TMP_INSIDE = True ");
   }
-  else{
+  else {
     Serial.println("WARNING: CHECK_TMP_INSIDE = False, check of internal thermometer will be disabled!");
   }
 
@@ -222,6 +235,7 @@ void setup(void) {
     outsideThermometerIndex = outsideThermometerIndexString.toInt();
   }
 
+  Serial.print("INFO: Checking ouside temperature every " + String(CHECK_OUTSIDE_TMP_COUNTER * LOOP_DELAY / 1000) + " seconds." );
   timeClient.update();
 
 }
@@ -231,25 +245,50 @@ void setup(void) {
   /////////////////////// L O O P   F U N C T I O N //////////////////////////
   ////////////////////////////////////////////////////////////////////////////
 */
+
+
 void loop(void) {
 
   server.handleClient();
-  if (counter % 50 == 0) {
-    current_temp_inside = getTemperature(getInsideThermometer());
+
+  if (counter % CHECK_OUTSIDE_TMP_COUNTER == 0) {
     current_temp = getTemperature(outsideThermometerIndex);
   }
-  if (loadMode == KEEP && !heaterStatus) {
-    if (current_temp < _min(temperatureKeep,MAX_POSSIBLE_TMP) && current_temp > 0) {
-      Serial.println("WARNING: Keep enabled, enable load");
-      enableLoad();
+
+  if (counter % CHECK_OUTSIDE_INTERNAL_COUNTER == 0) {
+    current_temp_inside = getTemperature(getInsideThermometer());
+  }
+
+  if (!heaterStatus && loadMode == KEEP) {
+
+    if (current_temp < _min(temperatureKeep, MAX_POSSIBLE_TMP) && current_temp > 0) {
+      int current_epoch = timeClient.getEpochTime();
+      if (last_disable_epoch + OFF_ON_DELAY_MS < current_epoch)
+      {
+        Serial.println("WARNING: Keep enabled, enable load");
+        enableLoad();
+      }
+      else {
+        delay(100);
+        //Cannot enable Keep, limited by epoch
+        //Serial.println("WARNING: Cannot enable Keep, limited by epoch, will be enabled in " + String((last_disable_epoch + OFF_ON_DELAY_MS) - current_epoch ) + " seconds.");
+      }
+
+
     }
   }
   if (heaterStatus) {
-    if (current_temp > MAX_POSSIBLE_TMP || (loadMode == KEEP && current_temp > temperatureKeep)) {
-      Serial.println("WARNING: Current temperature is bigger of possible maximum. " + String(current_temp) + ">" + String(MAX_POSSIBLE_TMP));
+    if (current_temp > MAX_POSSIBLE_TMP || (loadMode == KEEP && current_temp >= temperatureKeep)) {
+      if (current_temp > MAX_POSSIBLE_TMP ) {
+        Serial.println("WARNING: Current temperature is bigger of possible maximum. " + String(current_temp) + ">" + String(MAX_POSSIBLE_TMP));
+      }
+      else {
+        Serial.println("WARNING: Current temperature is bigger of defined Keep. " + String(current_temp) + String(temperatureKeep) );
+      }
       Serial.println("WARNING: Disabling Load");
       disableLoad();
       secure_disabled = true;
+      last_disable_epoch = timeClient.getEpochTime();
     }
     if (CHECK_TMP_INSIDE && current_temp_inside > MAX_POSSIBLE_TMP_INSIDE) {
       Serial.println("WARNING: Current temperature INSIDE is bigger of possible maximum. " + String(current_temp_inside) + ">" + String(MAX_POSSIBLE_TMP_INSIDE));
@@ -310,11 +349,11 @@ void loop(void) {
 
 
 /**
- * 
- */
+
+*/
 String build_index() {
-                  //"'current_temperature': '" + String(getTemperature(outsideThermometerIndex)) + "'," +
-                  //"'inside_temperature': '" + String(getTemperature(getInsideThermometer())) + "'," + 
+  //"'current_temperature': '" + String(getTemperature(outsideThermometerIndex)) + "'," +
+  //"'inside_temperature': '" + String(getTemperature(getInsideThermometer())) + "'," +
   String ret_js = String("") + "load = \n{" +
                   "'boiler_mode': '" + String(loadMode) + "'," +
                   "'load_mode': '" + String(loadMode) + "'," +
@@ -323,8 +362,9 @@ String build_index() {
                   "'max_temperature': '" + String(MAX_POSSIBLE_TMP) + "'," +
                   "'max_temperature_inside': '" + String(MAX_POSSIBLE_TMP_INSIDE) + "'," +
                   "'keep_temperature': '" + String(temperatureKeep) + "'," +
+                  "'outside_tmp_trash_hold': '" + String(OUTSIDE_TMP_TRASH_HOLD) + "'," +
                   "'current_temperature': '" + String(current_temp) + "'," +
-                  "'inside_temperature': '" + String(current_temp_inside) + "'," + 
+                  "'inside_temperature': '" + String(current_temp_inside) + "'," +
                   "'flash_chip_id': '" + String(ESP.getFlashChipId()) + "'," +
                   "'flash_chip_size': '" + String(ESP.getFlashChipSize()) + "'," +
                   "'flash_chip_speed': '" + String(ESP.getFlashChipSpeed()) + "'," +
@@ -359,9 +399,9 @@ String build_index() {
 }
 
 /**
- * 
- */
-int getInsideThermometer(){
+
+*/
+int getInsideThermometer() {
   return (1 - outsideThermometerIndex); // TODO fix it
 }
 
@@ -399,7 +439,7 @@ void enableLoad() {
   else {
     secure_disabled = false;
     heaterStatus = 1;
-    digitalWrite(HEATER_VCC, 1);
+    digitalWrite(LOAD_VCC, 1);
   }
 }
 
@@ -408,7 +448,7 @@ void enableLoad() {
 */
 void disableLoad() {
   heaterStatus = 0;
-  digitalWrite(HEATER_VCC, 0);
+  digitalWrite(LOAD_VCC, 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -518,8 +558,8 @@ String printTemperatureToSerial() {
 }
 
 /**
- * 
- */
+
+*/
 String get_thermometers_addr() {
   String data = "[";
   int i = 0;
