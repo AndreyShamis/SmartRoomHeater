@@ -283,7 +283,7 @@ void loop(void) {
         Serial.println("WARNING: Current temperature is bigger of possible maximum. " + String(current_temp) + ">" + String(MAX_POSSIBLE_TMP));
       }
       else {
-        Serial.println("WARNING: Current temperature is bigger of defined Keep. " + String(current_temp) + String(temperatureKeep) );
+        Serial.println("WARNING: Current temperature is bigger of defined Keep. " + String(current_temp)  + ">" + String(temperatureKeep) );
       }
       Serial.println("WARNING: Disabling Load");
       disableLoad();
