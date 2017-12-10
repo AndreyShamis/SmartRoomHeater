@@ -8,6 +8,9 @@ This code provide ability to controll Load with Solid State Relay SSR
 * **DallasTemperature** https://github.com/milesburton/Arduino-Temperature-Control-Library
 * **NTPClient** https://github.com/arduino-libraries/NTPClient
 
+#### Software installation
+Put downloaded folders under /home/USER/Arduino/libraries/
+
 ### Hardware
 In Smart Heater project used:
 * 2 * DS1822+   https://datasheets.maximintegrated.com/en/ds/DS1822.pdf  9-12bit  -55-125
@@ -23,4 +26,5 @@ In Smart Heater project used:
 ## Release
 - Production Relaease 29.11.2017
 
-Author: Andrey Shamis lolnik@gmail.com @AndreyShamis
+Author: Andrey Shamis lolnik@gmail.com
+@AndreyShamis
