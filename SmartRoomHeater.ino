@@ -6,7 +6,12 @@
         1 * NodeMCU
         1 * Solid state Relay FOTEK SSR-25 DA
         1 * 220v to 5v USB PS
-
+    Security:
+        1. On WiFi disconnect the load will be disabled(KEEP mode only)
+        2. Delay between disable to enable- default 60 seconds(KEEP mode only)
+        3, In case temperature value is anomalous the load will be disabled
+        4. Watch inside thermometer, the maximum inside temperature is MAX_POSSIBLE_TMP_INSIDE
+        
     Production Relaease 29.11.2017
 
     Author: Andrey Shamis lolnik@gmail.com
@@ -48,7 +53,13 @@ extern "C" {
 #define   NTP_UPDATE_INTERVAL_MS    60000
 #define   LOOP_DELAY                10
 #define   CHECK_TMP_INSIDE          1
-#define   OFF_ON_DELAY_MS           60
+
+/**
+ * Set delay between load disabled to load enabled in seconds
+ * When the value is 60, load can be automatically enabled after 1 minutes 
+ * in case keeped temperature is higher of current temp
+ */
+#define   OFF_ON_DELAY_SEC          60
 
 /**
    shows counter values identical to one second
@@ -263,7 +274,7 @@ void loop(void) {
 
     if (current_temp < _min(temperatureKeep, MAX_POSSIBLE_TMP) && current_temp > 0) {
       int current_epoch = timeClient.getEpochTime();
-      if (last_disable_epoch + OFF_ON_DELAY_MS < current_epoch)
+      if (last_disable_epoch + OFF_ON_DELAY_SEC < current_epoch)
       {
         Serial.println("WARNING: Keep enabled, enable load");
         enableLoad();
@@ -271,7 +282,7 @@ void loop(void) {
       else {
         delay(100);
         //Cannot enable Keep, limited by epoch
-        //Serial.println("WARNING: Cannot enable Keep, limited by epoch, will be enabled in " + String((last_disable_epoch + OFF_ON_DELAY_MS) - current_epoch ) + " seconds.");
+        //Serial.println("WARNING: Cannot enable Keep, limited by epoch, will be enabled in " + String((last_disable_epoch + OFF_ON_DELAY_SEC) - current_epoch ) + " seconds.");
       }
 
 
