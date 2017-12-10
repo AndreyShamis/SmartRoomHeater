@@ -9,7 +9,7 @@ This code provide ability to controll Load with Solid State Relay SSR
 * **NTPClient** https://github.com/arduino-libraries/NTPClient
 
 #### Software installation
-Put downloaded folders under /home/USER/Arduino/libraries/
+Put folders from downloaded archives under _/home/USER/Arduino/libraries/_
 
 ### Hardware
 In Smart Heater project used:
@@ -27,4 +27,4 @@ In Smart Heater project used:
 - Production Relaease 29.11.2017
 
 Author: Andrey Shamis lolnik@gmail.com
-@AndreyShamis
+@andreyshamis
