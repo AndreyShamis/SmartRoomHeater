@@ -11,8 +11,10 @@
         2. Delay between disable to enable- default 60 seconds(KEEP mode only)
         3, In case temperature value is anomalous the load will be disabled
         4. Watch inside thermometer, the maximum inside temperature is MAX_POSSIBLE_TMP_INSIDE
-        
-    Production Relaease 29.11.2017
+        5. Check internet connecitivity, if there is no ping to 8.8.8.8, load will be disabled
+
+    Production Relaease v0.2 12.12.2017
+
 
     Author: Andrey Shamis lolnik@gmail.com
 
@@ -33,6 +35,7 @@ extern "C" {
 #include <WiFiUdp.h>
 #include <Wire.h>
 #include <ESP8266WiFi.h>
+#include <ESP8266Ping.h>
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
@@ -54,10 +57,10 @@ extern "C" {
 #define   CHECK_TMP_INSIDE          1                       // For disable validation of seconds thermometer use 0
 
 /**
- * Set delay between load disabled to load enabled in seconds
- * When the value is 60, load can be automatically enabled after 1 minutes 
- * in case keeped temperature is higher of current temp
- */
+   Set delay between load disabled to load enabled in seconds
+   When the value is 60, load can be automatically enabled after 1 minutes
+   in case keeped temperature is higher of current temp
+*/
 #define   OFF_ON_DELAY_SEC          60
 
 /**
@@ -67,6 +70,7 @@ extern "C" {
 #define COUNTER_IN_LOOP_SECOND              (int)(1000/LOOP_DELAY)
 #define CHECK_OUTSIDE_TMP_COUNTER           (int)(COUNTER_IN_LOOP_SECOND*4)
 #define CHECK_OUTSIDE_INTERNAL_COUNTER      (CHECK_OUTSIDE_TMP_COUNTER*2)
+#define CHECK_INTERNET_CONNECTIVITY_CTR     (COUNTER_IN_LOOP_SECOND*30)
 
 /**
  ****************************************************************************************************
@@ -103,6 +107,7 @@ float       current_temp            = START_TEMP;
 float       current_temp_inside     = START_TEMP;
 int         outsideThermometerIndex = 0;
 int         last_disable_epoch      = 0;
+bool        internet_access         = 0;
 /**
  ****************************************************************************************************
 */
@@ -117,7 +122,7 @@ WiFiUDP ntpUDP;
     Additionaly you can specify the update interval (in milliseconds, can be changed using setUpdateInterval()).
 */
 NTPClient timeClient(ntpUDP, NTP_SERVER, NTP_TIME_OFFSET_SEC, NTP_UPDATE_INTERVAL_MS);
-
+IPAddress pingServer (8, 8, 8, 8);
 LoadModeType loadMode = MANUAL;
 
 ADC_MODE(ADC_VCC);
@@ -260,7 +265,7 @@ void setup(void) {
 void loop(void) {
 
   server.handleClient();
-  
+
   // Check temperature for thermometer outside
   if (counter % CHECK_OUTSIDE_TMP_COUNTER == 0) {
     current_temp = getTemperature(outsideThermometerIndex);
@@ -321,10 +326,7 @@ void loop(void) {
     disableLoad();
     secure_disabled = true;
   }
-  if (counter >= 120000) {
-    counter = 0;
-    //printTemperatureToSerial();
-  }
+
   if (counter == 25) {
     timeClient.update();
     Serial.println(timeClient.getFormattedTime()); //Serial.println(timeClient.getEpochTime());
@@ -342,6 +344,7 @@ void loop(void) {
   }
 
   if (WiFi.status() != WL_CONNECTED) {
+    internet_access = 0;
     if (heaterStatus) {
       disableLoad();
       secure_disabled = true;
@@ -351,10 +354,26 @@ void loop(void) {
     Serial.println("WIFI DISCONNECTED");
     delay(200);
   }
-
+  if (counter % CHECK_INTERNET_CONNECTIVITY_CTR == 0 || !internet_access)
+  {
+    internet_access = Ping.ping(pingServer, 2);
+    //int avg_time_ms = Ping.averageTime();
+    //Serial.println("Ping result is " + String(internet_access) + " avg_time_ms:" + String(avg_time_ms));
+  }
+  if (!internet_access && heaterStatus) {
+    disableLoad();
+    secure_disabled = true;
+    Serial.println("WARNING: No Internet connection");
+    Serial.println("WARNING: Disabling Load");
+    delay(2000);
+  }
   //ESP.deepSleep(sleepTimeS * 1000000, RF_DEFAULT);
   delay(LOOP_DELAY);
   counter++;
+  if (counter >= 120000) {
+    counter = 0;
+    //printTemperatureToSerial();
+  }
 }
 
 
@@ -368,6 +387,7 @@ String build_index() {
   String ret_js = String("") + "load = \n{" +
                   "'boiler_mode': '" + String(loadMode) + "'," +
                   "'load_mode': '" + String(loadMode) + "'," +
+                  "'internet_access': '" + String(internet_access) + "'," +
                   "'load_status': '" + String(heaterStatus) + "'," +
                   "'disbaled_by_watch': '" + String(secure_disabled) + "'," +
                   "'max_temperature': '" + String(MAX_POSSIBLE_TMP) + "'," +
