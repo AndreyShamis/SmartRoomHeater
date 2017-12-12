@@ -55,6 +55,7 @@ extern "C" {
 #define   NTP_UPDATE_INTERVAL_MS    60000                   // NTP Update interval - 1 min
 #define   LOOP_DELAY                10                      // Wait each loop for LOOP_DELAY
 #define   CHECK_TMP_INSIDE          1                       // For disable validation of seconds thermometer use 0
+#define   CHECK_INTERNET_CONNECT    1                       // For disable internet connectiviy check use 0
 
 /**
    Set delay between load disabled to load enabled in seconds
@@ -147,6 +148,12 @@ int     getInsideThermometer();
 void setup(void) {
   //ADC_MODE(ADC_VCC);
   pinMode(LOAD_VCC, OUTPUT);
+  if (CHECK_INTERNET_CONNECT) {
+    internet_access = 0;
+  }
+  else {
+    internet_access = 1;
+  }
   disableLoad();
   sensor.begin();
   Serial.begin(UART_BAUD_RATE);
@@ -354,19 +361,23 @@ void loop(void) {
     Serial.println("WIFI DISCONNECTED");
     delay(200);
   }
-  if (counter % CHECK_INTERNET_CONNECTIVITY_CTR == 0 || !internet_access)
-  {
-    internet_access = Ping.ping(pingServer, 2);
-    //int avg_time_ms = Ping.averageTime();
-    //Serial.println("Ping result is " + String(internet_access) + " avg_time_ms:" + String(avg_time_ms));
+  
+  if (CHECK_INTERNET_CONNECT) {
+    if (counter % CHECK_INTERNET_CONNECTIVITY_CTR == 0 || !internet_access)
+    {
+      internet_access = Ping.ping(pingServer, 2);
+      //int avg_time_ms = Ping.averageTime();
+      //Serial.println("Ping result is " + String(internet_access) + " avg_time_ms:" + String(avg_time_ms));
+    }
+    if (!internet_access && heaterStatus) {
+      disableLoad();
+      secure_disabled = true;
+      Serial.println("WARNING: No Internet connection");
+      Serial.println("WARNING: Disabling Load");
+      delay(2000);
+    }
   }
-  if (!internet_access && heaterStatus) {
-    disableLoad();
-    secure_disabled = true;
-    Serial.println("WARNING: No Internet connection");
-    Serial.println("WARNING: Disabling Load");
-    delay(2000);
-  }
+
   //ESP.deepSleep(sleepTimeS * 1000000, RF_DEFAULT);
   delay(LOOP_DELAY);
   counter++;
