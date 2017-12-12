@@ -24,7 +24,8 @@ In Smart Heater project used:
 4. Watch inside thermometer, the maximum inside temperature is MAX_POSSIBLE_TMP_INSIDE
 
 ## Release
-- Production Relaease 29.11.2017
+- Production Relaease v0.1 29.11.2017
+- Production Relaease v0.2 12.12.2017
 
 Author: Andrey Shamis lolnik@gmail.com
 @andreyshamis
