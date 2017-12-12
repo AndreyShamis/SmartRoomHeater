@@ -42,17 +42,16 @@ extern "C" {
 /**
  ****************************************************************************************************
 */
-#define   ONE_WIRE_BUS              D4 //D4 2
-#define   LOAD_VCC                  D7 //D7 13
-#define   NUMBER_OF_DEVICES         1
-#define   CS_PIN                    D3
-#define   TEMPERATURE_PRECISION     12      // Possible value 9-12
+#define   START_TEMP                -10                     // Default value for temperature variables on start
+#define   ONE_WIRE_BUS              D4                      // D4 2
+#define   LOAD_VCC                  D7                      // D7 13
+#define   TEMPERATURE_PRECISION     12                      // Possible value 9-12
 #define   UART_BAUD_RATE            921600
-#define   NTP_SERVER                "europe.pool.ntp.org"
-#define   NTP_TIME_OFFSET_SEC       10800
-#define   NTP_UPDATE_INTERVAL_MS    60000
-#define   LOOP_DELAY                10
-#define   CHECK_TMP_INSIDE          1
+#define   NTP_SERVER                "0.asia.pool.ntp.org"   // Pool of ntp server http://www.pool.ntp.org/zone/asia
+#define   NTP_TIME_OFFSET_SEC       10800                   // Time offset
+#define   NTP_UPDATE_INTERVAL_MS    60000                   // NTP Update interval - 1 min
+#define   LOOP_DELAY                10                      // Wait each loop for LOOP_DELAY
+#define   CHECK_TMP_INSIDE          1                       // For disable validation of seconds thermometer use 0
 
 /**
  * Set delay between load disabled to load enabled in seconds
@@ -100,8 +99,8 @@ float       MAX_POSSIBLE_TMP        = 26;
 float       MAX_POSSIBLE_TMP_INSIDE = 40;
 bool        secure_disabled         = false;
 float       temperatureKeep         = 22;
-float       current_temp            = -10;
-float       current_temp_inside     = -10;
+float       current_temp            = START_TEMP;
+float       current_temp_inside     = START_TEMP;
 int         outsideThermometerIndex = 0;
 int         last_disable_epoch      = 0;
 /**
@@ -129,7 +128,7 @@ String  getAddressString(DeviceAddress deviceAddress);
 void    disableLoad();
 void    enableLoad();
 float   getTemperature(int dev = 0);
-String  printTemperatureToSerial();
+void    printTemperatureToSerial();
 String  read_setting(const char* fname);
 void    save_setting(const char* fname, String value);
 int     getInsideThermometer();
@@ -261,11 +260,12 @@ void setup(void) {
 void loop(void) {
 
   server.handleClient();
-
+  
+  // Check temperature for thermometer outside
   if (counter % CHECK_OUTSIDE_TMP_COUNTER == 0) {
     current_temp = getTemperature(outsideThermometerIndex);
   }
-
+  // Check temperature for thermometer inside
   if (counter % CHECK_OUTSIDE_INTERNAL_COUNTER == 0) {
     current_temp_inside = getTemperature(getInsideThermometer());
   }
@@ -443,9 +443,9 @@ float getTemperature(int dev/*=0*/) {
    Enable Load
 */
 void enableLoad() {
-  float current_temp = getTemperature(outsideThermometerIndex);
-  if (current_temp > MAX_POSSIBLE_TMP) {
-    Serial.println("ERROR: Current temperature is bigger of possible maximum. " + String(current_temp) + ">" + String(MAX_POSSIBLE_TMP));
+  float current_temp_tmp = getTemperature(outsideThermometerIndex);
+  if (current_temp_tmp > MAX_POSSIBLE_TMP) {
+    Serial.println("ERROR: Current temperature is bigger of possible maximum. " + String(current_temp_tmp) + ">" + String(MAX_POSSIBLE_TMP));
   }
   else {
     secure_disabled = false;
@@ -556,16 +556,13 @@ String build_device_info() {
 }
 
 /**
-   Get end print temperature to serial
+   print temperature to serial
 */
-String printTemperatureToSerial() {
+void printTemperatureToSerial() {
   int dc = sensor.getDeviceCount();
   for (int i = 0 ; i < dc; i++) {
-    current_temp       = getTemperature(i);
-    Serial.print("INFO: Temperature[" + String(i) + "] C: ");
-    Serial.println(current_temp);
+    Serial.println("INFO: Temperature[" + String(i) + "] C: " + String(getTemperature(i)));
   }
-  return String(current_temp);
 }
 
 /**
@@ -574,8 +571,8 @@ String printTemperatureToSerial() {
 String get_thermometers_addr() {
   String data = "[";
   int i = 0;
-  int counter = sensor.getDeviceCount();
-  for (i = 0; i < counter; i++) {
+  int dev_counter = sensor.getDeviceCount();
+  for (i = 0; i < dev_counter; i++) {
     data = data + String("\"") + String(getAddressString(insideThermometer[i])) + String("\" , ");
     //Serial.println("Build  " + String(i) + " : " + String(getAddressString(insideThermometer[i])) + " "  + data);
   }
