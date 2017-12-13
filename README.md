@@ -7,6 +7,7 @@ This code provide ability to controll Load with Solid State Relay SSR
 * **Time** https://github.com/PaulStoffregen/Time
 * **DallasTemperature** https://github.com/milesburton/Arduino-Temperature-Control-Library
 * **NTPClient** https://github.com/arduino-libraries/NTPClient
+* **ESP8266Ping** https://github.com/dancol90/ESP8266Ping
 
 #### Software installation
 Put folders from downloaded archives under _/home/USER/Arduino/libraries/_
@@ -22,7 +23,7 @@ In Smart Heater project used:
 2. Delay between disable to enable- default 60 seconds(KEEP mode only)
 3. In case temperature value is anomalous the load will be disabled
 4. Watch inside thermometer, the maximum inside temperature is MAX_POSSIBLE_TMP_INSIDE
-5. Check internet connecitivity, if there is no ping to 8.8.8.8, load will be diabled
+5. Check internet connecitivity, if there is no ping to 8.8.8.8, load will be disabled
 
 ## Release
 - Production Relaease v0.1 29.11.2017
