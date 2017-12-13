@@ -164,29 +164,10 @@ void setup(void) {
   Serial.println("PASS: SPIFFS startted.");
   //  Serial.println("INFO: Compile SPIFFS");
   //  SPIFFS.format();
-  WiFi.mode(WIFI_STA);       //  Disable AP Mode - set mode to WIFI_AP, WIFI_STA, or WIFI_AP_STA.
-  WiFi.begin(ssid, password);
 
-  // Wait for connection
-  Serial.println("INFO: Connecting to [" + String(ssid) + "][" + String(password) + "]...");
-  int con_counter = 0;
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(100);
-    Serial.print(".");
-    con_counter++;
-    if (con_counter % 20 == 0) {
-      Serial.println("");
-      Serial.println("WARNING: Still connecting...");
-    }
-  }
-  Serial.println("");
-  Serial.print("PASS: Connected to [" + String(ssid) + "]  IP address: ");
-  Serial.println(WiFi.localIP());
-  if (MDNS.begin("esp8266")) {
-    Serial.println("PASS: MDNS responder started");
-  }
-  Serial.println("-----------------------------------");
+  wifi_connect();
   timeClient.begin();
+  server_start();
 
   Serial.print("INFO: Found ");
   Serial.print(sensor.getDeviceCount(), DEC);
@@ -211,42 +192,15 @@ void setup(void) {
       Serial.println();
     }
   }
-
-  server.on("/", handleRoot);
-  server.on("/inline", []() {
-    server.send(200, "text/plain", "this works as well");
-  });
-  server.on("/el", []() {
-    enableLoad();
-    loadMode = MANUAL;
-    handleRoot();
-  });
-  server.on("/dl", []() {
-    disableLoad();
-    loadMode = MANUAL;
-    handleRoot();
-  });
-  server.on("/setDallasIndex", []() {
-    uploadAndSaveOutsideThermometerIndex();
-    handleRoot();
-  });
-  server.on("/keep", []() {
-    last_disable_epoch = 0;
-    saveLoadMode();
-    handleRoot();
-  });
-
-  server.onNotFound(handleNotFound);
-  Serial.println("INFO: Staring HTTP server...");
-  server.begin();
-  Serial.println("PASS: HTTP server started");
-
   if (CHECK_TMP_INSIDE) {
     Serial.println("INFO: CHECK_TMP_INSIDE = True ");
   }
   else {
     Serial.println("WARNING: CHECK_TMP_INSIDE = False, check of internal thermometer will be disabled!");
   }
+
+
+
 
   String outsideThermometerIndexString = read_setting("/outTmpIndex");
 
@@ -261,7 +215,6 @@ void setup(void) {
   timeClient.update();
 
 }
-
 
 /**
   /////////////////////// L O O P   F U N C T I O N //////////////////////////
@@ -296,10 +249,9 @@ void loop(void) {
         //Cannot enable Keep, limited by epoch
         //Serial.println("WARNING: Cannot enable Keep, limited by epoch, will be enabled in " + String((last_disable_epoch + OFF_ON_DELAY_SEC) - current_epoch ) + " seconds.");
       }
-
-
     }
   }
+
   if (heaterStatus) {
     if (current_temp > MAX_POSSIBLE_TMP || (loadMode == KEEP && current_temp >= temperatureKeep)) {
       if (current_temp > MAX_POSSIBLE_TMP ) {
@@ -336,18 +288,7 @@ void loop(void) {
 
   if (counter == 25) {
     timeClient.update();
-    Serial.println(timeClient.getFormattedTime()); //Serial.println(timeClient.getEpochTime());
-    Serial.println("INFO: -----------------------------------------------------------------------");
-    Serial.println("Heater status: " + String(heaterStatus));
-    Serial.println("getFlashChipId: " + String(ESP.getFlashChipId()) + "\t\t getFlashChipSize: " + String(ESP.getFlashChipSize()));
-    Serial.println("getFlashChipSpeed: " + String(ESP.getFlashChipSpeed()) + "\t getFlashChipMode: " + String(ESP.getFlashChipMode()));
-    Serial.println("getSdkVersion: " + String(ESP.getSdkVersion()) + "\t getCoreVersion: " + ESP.getCoreVersion() + "\t\t getBootVersion: " + ESP.getBootVersion());
-    Serial.println("getCpuFreqMHz: " + String(ESP.getCpuFreqMHz()) + " \t getBootMode: " + String(ESP.getBootMode()));
-    Serial.println("HostName :" + WiFi.hostname() + "\tmacAddress: " + WiFi.macAddress() + "\t Channel : " + String(WiFi.channel()) + "\t\t\t RSSI: " + WiFi.RSSI());
-    Serial.println("getSketchSize: " + String(ESP.getSketchSize()) + "\t\t getFreeSketchSpace: " + String(ESP.getFreeSketchSpace()));
-    //Serial.println("getResetReason: " + ESP.getResetReason());
-    //Serial.println("getResetInfo: " + ESP.getResetInfo());
-    //Serial.println("Address : " + getAddressString(insideThermometer[0]));
+    print_all_info();
   }
 
   if (WiFi.status() != WL_CONNECTED) {
@@ -358,10 +299,25 @@ void loop(void) {
       Serial.println("WARNING: No WiFi Connection");
       Serial.println("WARNING: Disabling Load");
     }
-    Serial.println("WIFI DISCONNECTED");
-    delay(200);
+    delay(2000);
+    // Check if not connected , disable all network services, reconnect , enable all network services
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println("FAIL: WIFI DISCONNECTED");
+      close_all_services();
+      delay(3000);
+      if (wifi_connect()) {
+        timeClient.begin();
+        server_start();
+        delay(200);
+        timeClient.update();
+      } else {
+        Serial.println("FAIL: Cannot reconnect to WIFI... ");
+        delay(3000);
+      }
+    }
+
   }
-  
+
   if (CHECK_INTERNET_CONNECT) {
     if (counter % CHECK_INTERNET_CONNECTIVITY_CTR == 0 || !internet_access)
     {
@@ -387,6 +343,96 @@ void loop(void) {
   }
 }
 
+
+/**
+
+*/
+void server_start() {
+  server.on("/", handleRoot);
+  server.on("/inline", []() {
+    server.send(200, "text/plain", "this works as well");
+  });
+  server.on("/el", []() {
+    enableLoad();
+    loadMode = MANUAL;
+    handleRoot();
+  });
+  server.on("/dl", []() {
+    disableLoad();
+    loadMode = MANUAL;
+    handleRoot();
+  });
+  server.on("/setDallasIndex", []() {
+    uploadAndSaveOutsideThermometerIndex();
+    handleRoot();
+  });
+  server.on("/keep", []() {
+    last_disable_epoch = 0;
+    saveLoadMode();
+    handleRoot();
+  });
+
+  server.onNotFound(handleNotFound);
+  Serial.println("INFO: Staring HTTP server...");
+  server.begin();
+  Serial.println("PASS: HTTP server started");
+}
+
+/**
+
+*/
+bool wifi_connect() {
+  WiFi.mode(WIFI_STA);       //  Disable AP Mode - set mode to WIFI_AP, WIFI_STA, or WIFI_AP_STA.
+  WiFi.begin(ssid, password);
+
+  // Wait for connection
+  Serial.println("INFO: Connecting to [" + String(ssid) + "][" + String(password) + "]...");
+  int con_counter = 0;
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(100);
+    Serial.print(".");
+    con_counter++;
+    if (con_counter % 20 == 0) {
+      Serial.println("");
+      Serial.println("WARNING: Still connecting...");
+    }
+    if (con_counter == 100) {
+      Serial.println("");
+      Serial.println("FAIL: Cannot connect to [" + String(ssid) + "] ");
+      return false;
+    }
+  }
+  Serial.println("");
+  Serial.print("PASS: Connected to [" + String(ssid) + "]  IP address: ");
+  Serial.println(WiFi.localIP());
+  if (MDNS.begin("esp8266")) {
+    Serial.println("PASS: MDNS responder started");
+  }
+  Serial.println("-----------------------------------");
+  return true;
+}
+
+/**
+  Close all network services
+*/
+void close_all_services() {
+  Serial.println("INFO: ----> Starting close all network services <----");
+  
+  Serial.println("INFO: ----> Closing NTP Client...");
+  timeClient.end();
+    
+  Serial.println("INFO: ----> Closing WEB Server...");
+  server.close();
+  
+  Serial.println("INFO: ----> Disconnecting WIFI...");
+  WiFi.disconnect();
+  Serial.println("INFO: ----> Disabling WiFi...");
+  WiFi.mode(WIFI_OFF);
+  Serial.println("INFO: ----> WiFi disabled...");
+  
+  yield();
+  Serial.println("INFO: ----> Finished closing all network services <----");
+}
 
 
 /**
@@ -439,6 +485,7 @@ String build_index() {
                "</body></html>";
   return ret;
 }
+
 
 /**
 
@@ -567,6 +614,23 @@ void handleRoot() {
 
 ////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////
+/**
+
+*/
+void print_all_info() {
+  Serial.println(timeClient.getFormattedTime()); //Serial.println(timeClient.getEpochTime());
+  Serial.println("INFO: -----------------------------------------------------------------------");
+  Serial.println("Heater status: " + String(heaterStatus));
+  Serial.println("getFlashChipId: " + String(ESP.getFlashChipId()) + "\t\t getFlashChipSize: " + String(ESP.getFlashChipSize()));
+  Serial.println("getFlashChipSpeed: " + String(ESP.getFlashChipSpeed()) + "\t getFlashChipMode: " + String(ESP.getFlashChipMode()));
+  Serial.println("getSdkVersion: " + String(ESP.getSdkVersion()) + "\t getCoreVersion: " + ESP.getCoreVersion() + "\t\t getBootVersion: " + ESP.getBootVersion());
+  Serial.println("getCpuFreqMHz: " + String(ESP.getCpuFreqMHz()) + " \t getBootMode: " + String(ESP.getBootMode()));
+  Serial.println("HostName :" + WiFi.hostname() + "\tmacAddress: " + WiFi.macAddress() + "\t Channel : " + String(WiFi.channel()) + "\t\t\t RSSI: " + WiFi.RSSI());
+  Serial.println("getSketchSize: " + String(ESP.getSketchSize()) + "\t\t getFreeSketchSpace: " + String(ESP.getFreeSketchSpace()));
+  //Serial.println("getResetReason: " + ESP.getResetReason());
+  //Serial.println("getResetInfo: " + ESP.getResetInfo());
+  //Serial.println("Address : " + getAddressString(insideThermometer[0]));
+}
 
 /**
 
