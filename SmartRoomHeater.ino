@@ -69,20 +69,21 @@ extern "C" {
 #define   LOOP_DELAY                        10                      // Wait each loop for LOOP_DELAY
 // Unchangeable settings
 #define   START_TEMP                        -10                     // Default value for temperature variables on start
+#define   INCORRECT_EPOCH                   200000                  // Minimum value for time epoch
 /**
    Set delay between load disabled to load enabled in seconds
    When the value is 60, load can be automatically enabled after 1 minutes
    in case keeped temperature is higher of current temp
 */
-#define   OFF_ON_DELAY_SEC                  60
+#define   OFF_ON_DELAY_SEC                  30
 
 /**
    shows counter values identical to one second
    For example loop_delay=10, counter sec will be 100 , when (counter%100 == 0) happens every second
 */
 #define COUNTER_IN_LOOP_SECOND              (int)(1000/LOOP_DELAY)
-#define CHECK_OUTSIDE_TMP_COUNTER           (int)(COUNTER_IN_LOOP_SECOND*4)
-#define CHECK_OUTSIDE_INTERNAL_COUNTER      (CHECK_OUTSIDE_TMP_COUNTER*2)
+#define CHECK_OUTSIDE_TMP_COUNTER           (int)(COUNTER_IN_LOOP_SECOND*3)
+#define CHECK_INTERNAL_COUNTER              (CHECK_OUTSIDE_TMP_COUNTER*5)
 #define CHECK_INTERNET_CONNECTIVITY_CTR     (COUNTER_IN_LOOP_SECOND*120)
 
 /**
@@ -102,6 +103,7 @@ enum LogType {
   PASS      = 3,
   FAIL_t    = 4,
   CRITICAL  = 5,
+  DEBUG     = 6,
 } ;
 
 
@@ -143,7 +145,6 @@ NTPClient           timeClient(ntpUDP, NTP_SERVER, NTP_TIME_OFFSET_SEC, NTP_UPDA
 */
 ADC_MODE(ADC_VCC);
 float   getTemperature(int dev = 0);
-//void message(String msg, enum LogType lt);
 /**
  ****************************************************************************************************
  ****************************************************************************************************
@@ -178,8 +179,8 @@ void setup(void) {
   timeClient.begin();
   start_thermal();
   message("Checking ouside temperature every " + String(CHECK_OUTSIDE_TMP_COUNTER * LOOP_DELAY / 1000) + " seconds." , INFO);
-  timeClient.update();
-  delay(1000);
+  //timeClient.update();
+  //delay(100);
   timeClient.forceUpdate();
   message(" ----> All started <----", PASS);
 
@@ -200,7 +201,7 @@ void loop(void) {
     current_temp = getTemperature(outsideThermometerIndex);
   }
   // Check temperature for thermometer inside
-  if (counter % CHECK_OUTSIDE_INTERNAL_COUNTER == 0) {
+  if (counter % CHECK_INTERNAL_COUNTER == 0) {
     current_temp_inside = getTemperature(getInsideThermometer());
   }
 
@@ -232,42 +233,34 @@ void loop(void) {
       message("Disabling Load", WARNING);
       disableLoad();
       secure_disabled = true;
-      last_disable_epoch = timeClient.getEpochTime();
+      //last_disable_epoch = timeClient.getEpochTime();
     }
     if (CHECK_TMP_INSIDE && current_temp_inside > MAX_POSSIBLE_TMP_INSIDE) {
-      message("Current temperature INSIDE is bigger of possible maximum. " + String(current_temp_inside) + ">" + String(MAX_POSSIBLE_TMP_INSIDE), WARNING);
-      message("Disabling Load", WARNING);
+      message("Disabling Load. Current temperature INSIDE is bigger of possible maximum. " + String(current_temp_inside) + ">" + String(MAX_POSSIBLE_TMP_INSIDE), WARNING);
       disableLoad();
       secure_disabled = true;
     }
   }
 
   if (current_temp < 1) {
-    message("Very LOW temperatute. " + String(current_temp), WARNING);
-    message("Disabling Load", WARNING);
+    message("Disabling Load. Very LOW temperatute. " + String(current_temp), WARNING);
     disableLoad();
     secure_disabled = true;
   }
 
   if (CHECK_TMP_INSIDE && current_temp_inside < 1) {
-    message("Very LOW temperatute INSIDE. " + String(current_temp_inside), WARNING);
-    message("Disabling Load", WARNING);
+    message("Disabling Load. Very LOW temperatute INSIDE. " + String(current_temp_inside), WARNING);
     disableLoad();
     secure_disabled = true;
   }
 
-  if (counter == 2500) {
-    timeClient.update();
-    print_all_info();
-  }
 
   if (WiFi.status() != WL_CONNECTED) {
     internet_access = 0;
     if (heaterStatus) {
       disableLoad();
       secure_disabled = true;
-      message("No WiFi Connection", WARNING);
-      message("Disabling Load", WARNING);
+      message("No WiFi Connection. Disabling Load", WARNING);
     }
     delay(2000);
 
@@ -292,26 +285,150 @@ void loop(void) {
     if (counter % CHECK_INTERNET_CONNECTIVITY_CTR == 0 || !internet_access)
     {
       internet_access = Ping.ping(pingServer, 2);
-      //int avg_time_ms = Ping.averageTime();
-      //message("Ping result is " + String(internet_access) + " avg_time_ms:" + String(avg_time_ms), INFO);
+      int avg_time_ms = Ping.averageTime();
+      message("Ping result is " + String(internet_access) + " avg_time_ms:" + String(avg_time_ms), INFO);
     }
     if (!internet_access && heaterStatus) {
       disableLoad();
       secure_disabled = true;
-      message("No Internet connection", WARNING);
-      delay(300);
-      message("Disabling Load", WARNING);
-      delay(2700);
+      message("No Internet connection. Disabling Load", WARNING);
+      delay(3000);
     }
   }
+  if (counter == 100) {
+    if (internet_access) {
+      update_time();
+    }
 
+    print_all_info();
+  }
   //ESP.deepSleep(sleepTimeS * 1000000, RF_DEFAULT);
   delay(LOOP_DELAY);
   counter++;
-  if (counter >= 120000) {
+  if (counter >= 12000) {
     counter = 0;
     //printTemperatureToSerial();
   }
+}
+
+
+
+/**
+
+*/
+//static inline char *stringFromLogType(enum LogType lt)
+static const char *stringFromLogType(enum LogType lt)
+{
+  static const char *strings[] = {"INFO", "WARN", "ERROR", "PASS", "FAIL", "CRITICAL", "DEBUG"};
+  return strings[lt];
+}
+
+/**
+   Print message to Serial console
+*/
+void message(String msg, enum LogType lt) {
+  if (MESSAGE_OPT) {
+    if (msg.length() == 0) {
+      Serial.println(msg);
+    }
+    else {
+      Serial.println(String(timeClient.getEpochTime()) + " : " + timeClient.getFormattedTime() + " : " + String(stringFromLogType(lt)) + " : " + msg);
+    }
+  }
+}
+
+/**
+   Start WEB server
+*/
+void server_start() {
+  server.on("/", handleRoot);
+  server.on("/inline", []() {
+    server.send(200, "text/plain", "this works as well");
+  });
+  server.on("/el", []() {
+    enableLoad();
+    loadMode = MANUAL;
+    handleRoot();
+  });
+  server.on("/dl", []() {
+    disableLoad();
+    loadMode = MANUAL;
+    handleRoot();
+  });
+  server.on("/setDallasIndex", []() {
+    uploadAndSaveOutsideThermometerIndex();
+    handleRoot();
+  });
+  server.on("/keep", []() {
+    last_disable_epoch = 0;
+    saveLoadMode();
+    handleRoot();
+  });
+
+  server.onNotFound(handleNotFound);
+  message("Staring HTTP server...", INFO);
+  server.begin();
+  message("HTTP server started", PASS);
+}
+
+/**
+   Set WiFi connection and connect
+*/
+bool wifi_connect() {
+  WiFi.mode(WIFI_STA);       //  Disable AP Mode - set mode to WIFI_AP, WIFI_STA, or WIFI_AP_STA.
+  WiFi.begin(ssid, password);
+
+  // Wait for connection
+  message("Connecting to [" + String(ssid) + "][" + String(password) + "]...", INFO);
+  int con_counter = 0;
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(100);
+    Serial.print(".");
+    con_counter++;
+    if (con_counter % 20 == 0) {
+      message("", INFO);
+      message("Still connecting...", WARNING);
+    }
+    if (con_counter == 100) {
+      message("", INFO);
+      message("Cannot connect to [" + String(ssid) + "] ", FAIL_t);
+      WiFi.disconnect();
+      message(" ----> Disabling WiFi...", INFO);
+      WiFi.mode(WIFI_OFF);
+      return false;
+    }
+  }
+  message("", INFO);
+  message("Connected to [" + String(ssid) + "]  IP address: " + WiFi.localIP().toString(), PASS);
+  //  Serial.print("PASS: );
+  //  Serial.println(WiFi.localIP());
+  if (MDNS.begin("esp8266")) {
+    message("MDNS responder started", PASS);
+  }
+  message("-----------------------------------", INFO);
+  return true;
+}
+
+/**
+  Close all network services
+*/
+void close_all_services() {
+  message(" ----> Starting close all network services <----", INFO);
+
+  message(" ----> Closing NTP Client...", INFO);
+  timeClient.end();
+
+  message(" ----> Closing WEB Server...", INFO);
+  server.close();
+
+  message(" ----> Disconnecting WIFI...", INFO);
+  WiFi.disconnect();
+  message(" ----> Disabling WiFi...", INFO);
+  WiFi.mode(WIFI_OFF);
+  message(" ----> WiFi disabled...", INFO);
+
+  yield();
+  message(" ----> Finished closing all network services <----", INFO);
 }
 
 /**
@@ -347,123 +464,6 @@ void start_thermal() {
     outsideThermometerIndex = outsideThermometerIndexString.toInt();
   }
 }
-
-/**
-
-*/
-//static inline char *stringFromLogType(enum LogType lt)
-char *stringFromLogType(enum LogType lt)
-{
-  static char *strings[] = {"INFO", "WARNING", "ERROR", "PASS", "FAIL", "CRITICAL",};
-  return strings[lt];
-}
-
-/**
-
-*/
-void message(String msg, enum LogType lt) {
-  if (MESSAGE_OPT) {
-    if (msg.length() == 0) {
-      Serial.println(msg);
-    }
-    else {
-      Serial.println(timeClient.getFormattedTime() + " : " + String(stringFromLogType(lt)) + " : " + msg);
-    }
-  }
-}
-
-
-/**
-
-*/
-void server_start() {
-  server.on("/", handleRoot);
-  server.on("/inline", []() {
-    server.send(200, "text/plain", "this works as well");
-  });
-  server.on("/el", []() {
-    enableLoad();
-    loadMode = MANUAL;
-    handleRoot();
-  });
-  server.on("/dl", []() {
-    disableLoad();
-    loadMode = MANUAL;
-    handleRoot();
-  });
-  server.on("/setDallasIndex", []() {
-    uploadAndSaveOutsideThermometerIndex();
-    handleRoot();
-  });
-  server.on("/keep", []() {
-    last_disable_epoch = 0;
-    saveLoadMode();
-    handleRoot();
-  });
-
-  server.onNotFound(handleNotFound);
-  message("Staring HTTP server...", INFO);
-  server.begin();
-  message("HTTP server started", PASS);
-}
-
-/**
-
-*/
-bool wifi_connect() {
-  WiFi.mode(WIFI_STA);       //  Disable AP Mode - set mode to WIFI_AP, WIFI_STA, or WIFI_AP_STA.
-  WiFi.begin(ssid, password);
-
-  // Wait for connection
-  message("Connecting to [" + String(ssid) + "][" + String(password) + "]...", INFO);
-  int con_counter = 0;
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(100);
-    Serial.print(".");
-    con_counter++;
-    if (con_counter % 20 == 0) {
-      message("", INFO);
-      message("Still connecting...", WARNING);
-    }
-    if (con_counter == 100) {
-      message("", INFO);
-      message("Cannot connect to [" + String(ssid) + "] ", FAIL_t);
-      return false;
-    }
-  }
-  message("", INFO);
-  message("Connected to [" + String(ssid) + "]  IP address: " + WiFi.localIP().toString(), PASS);
-//  Serial.print("PASS: );
-//  Serial.println(WiFi.localIP());
-  if (MDNS.begin("esp8266")) {
-    message("MDNS responder started", PASS);
-  }
-  message("-----------------------------------", INFO);
-  return true;
-}
-
-/**
-  Close all network services
-*/
-void close_all_services() {
-  message(" ----> Starting close all network services <----", INFO);
-
-  message(" ----> Closing NTP Client...", INFO);
-  timeClient.end();
-
-  message(" ----> Closing WEB Server...", INFO);
-  server.close();
-
-  message(" ----> Disconnecting WIFI...", INFO);
-  WiFi.disconnect();
-  message(" ----> Disabling WiFi...", INFO);
-  WiFi.mode(WIFI_OFF);
-  message(" ----> WiFi disabled...", INFO);
-
-  yield();
-  message(" ----> Finished closing all network services <----", INFO);
-}
-
 
 /**
 
@@ -515,6 +515,30 @@ String build_index() {
   return ret;
 }
 
+/**
+   Update time by NTP client
+*/
+void update_time() {
+  if (timeClient.getEpochTime() < INCORRECT_EPOCH) {
+    unsigned short counter_tmp = 0;
+    while (timeClient.getEpochTime() < INCORRECT_EPOCH && counter_tmp < 5) {
+      message("Incorrect time, trying to update: #:" + String(counter_tmp) , CRITICAL);
+      counter_tmp++;
+      timeClient.update();
+      timeClient.forceUpdate();
+      timeClient.update();
+      if (timeClient.getEpochTime() < INCORRECT_EPOCH) {
+        delay(1000);
+      }
+      else {
+        return;
+      }
+    }
+  }
+  else {
+    timeClient.update();
+  }
+}
 
 /**
 
@@ -535,10 +559,10 @@ void saveOutsideThermometerIndex(int newIndex) {
    Get Temperature
 */
 float getTemperature(int dev/*=0*/) {
-  //Serial.println("DEBUG: Requesting device " + String(dev));
-  sensor.setWaitForConversion(false);  // makes it async
+  //message("Requesting device " + String(dev), DEBUG);
+  sensor.setWaitForConversion(false);   // makes it async
   sensor.requestTemperatures();
-  sensor.setWaitForConversion(true);  // makes it async
+  sensor.setWaitForConversion(true);    // makes it async
   return sensor.getTempCByIndex(dev);
   //return sensor.getTempC(insideThermometer[dev]);
 }
@@ -566,6 +590,7 @@ void enableLoad() {
 */
 void disableLoad() {
   heaterStatus = 0;
+  last_disable_epoch = timeClient.getEpochTime();
   digitalWrite(LOAD_VCC, 0);
 }
 
@@ -691,7 +716,7 @@ void save_setting(const char* fname, String value) {
     return;
   }
   f.println(value);
-  Serial.print("Writed:" );
+  Serial.print("Written:");
   Serial.println(value);
   f.close();
 }
@@ -721,15 +746,13 @@ String read_setting(const char* fname) {
 
 */
 void print_all_info() {
-
+  message("", INFO);
   message("Heater status: " + String(heaterStatus), INFO);
-  message("getFlashChipId: " + String(ESP.getFlashChipId()) + "\t\t getFlashChipSize: " + String(ESP.getFlashChipSize()), INFO);
-  message("getFlashChipSpeed: " + String(ESP.getFlashChipSpeed()) + "\t getFlashChipMode: " + String(ESP.getFlashChipMode()),INFO);
-  message("getSdkVersion: " + String(ESP.getSdkVersion()) + "\t getCoreVersion: " + ESP.getCoreVersion() + "\t\t getBootVersion: " + ESP.getBootVersion(), INFO);
+  message("Flash Chip Id/Size/Speed/Mode: " + String(ESP.getFlashChipId()) + "/" + String(ESP.getFlashChipSize()) + "/" + String(ESP.getFlashChipSpeed()) + "/" + String(ESP.getFlashChipMode()), INFO);
+  message("SdkVersion: " + String(ESP.getSdkVersion()) + "\tCoreVersion: " + ESP.getCoreVersion() + "\tBootVersion: " + ESP.getBootVersion(), INFO);
+  message("CpuFreqMHz: " + String(ESP.getCpuFreqMHz()) + " \tBootMode: " + String(ESP.getBootMode()) + "\tSketchSize: " + String(ESP.getSketchSize()) + "\tFreeSketchSpace: " + String(ESP.getFreeSketchSpace()), INFO);
+  message("HostName: " + WiFi.hostname() + "\tChannel: " + String(WiFi.channel()) + "\tRSSI: " + WiFi.RSSI() + "\tmacAddress: " + WiFi.macAddress(), INFO);
 
-  message("getCpuFreqMHz: " + String(ESP.getCpuFreqMHz()) + " \t getBootMode: " + String(ESP.getBootMode()), INFO);
-  message("HostName :" + WiFi.hostname() + "\tmacAddress: " + WiFi.macAddress() + "\t Channel : " + String(WiFi.channel()) + "\t\t\t RSSI: " + WiFi.RSSI(), INFO);
-  message("getSketchSize: " + String(ESP.getSketchSize()) + "\t\t getFreeSketchSpace: " + String(ESP.getFreeSketchSpace()), INFO);
 
   //message("getResetReason: " + ESP.getResetReason(), INFO);
   //message("getResetInfo: " + ESP.getResetInfo(), INFO);
