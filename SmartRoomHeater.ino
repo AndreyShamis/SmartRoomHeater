@@ -51,7 +51,7 @@ extern "C" {
 
 #define   MESSAGE_OPT                       1
 // Custom settings
-#define   CHECK_TMP_INSIDE                  0                       // For disable validation of seconds thermometer use 0
+#define   CHECK_TMP_INSIDE                  1                       // For disable validation of seconds thermometer use 0
 #define   CHECK_INTERNET_CONNECT            1                       // For disable internet connectiviy check use 0
 
 // Thermometer and wire settings
@@ -285,8 +285,8 @@ void loop(void) {
     if (counter % CHECK_INTERNET_CONNECTIVITY_CTR == 0 || !internet_access)
     {
       internet_access = Ping.ping(pingServer, 2);
-      int avg_time_ms = Ping.averageTime();
-      message("Ping result is " + String(internet_access) + " avg_time_ms:" + String(avg_time_ms), INFO);
+      //int avg_time_ms = Ping.averageTime();
+      //message("Ping result is " + String(internet_access) + " avg_time_ms:" + String(avg_time_ms), INFO);
     }
     if (!internet_access && heaterStatus) {
       disableLoad();
