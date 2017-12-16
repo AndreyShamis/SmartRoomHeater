@@ -29,5 +29,6 @@ In Smart Heater project used:
 - Production Relaease v0.1 29.11.2017
 - Production Relaease v0.2 12.12.2017
 
+Integration with https://review.gerrithub.io/
 Author: Andrey Shamis lolnik@gmail.com
 @andreyshamis
