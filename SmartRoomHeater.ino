@@ -51,7 +51,7 @@ extern "C" {
 
 #define   MESSAGE_OPT                       1
 // Custom settings
-#define   CHECK_TMP_INSIDE                  1                       // For disable validation of seconds thermometer use 0
+#define   CHECK_TMP_INSIDE                  0                       // For disable validation of seconds thermometer use 0
 #define   CHECK_INTERNET_CONNECT            1                       // For disable internet connectiviy check use 0
 
 // Thermometer and wire settings
@@ -144,7 +144,7 @@ NTPClient           timeClient(ntpUDP, NTP_SERVER, NTP_TIME_OFFSET_SEC, NTP_UPDA
  ****************************************************************************************************
 */
 ADC_MODE(ADC_VCC);
-float   getTemperature(int dev = 0);
+float   getTemperature(const int dev = 0);
 /**
  ****************************************************************************************************
  ****************************************************************************************************
@@ -317,7 +317,7 @@ void loop(void) {
 
 */
 //static inline char *stringFromLogType(enum LogType lt)
-static const char *stringFromLogType(enum LogType lt)
+static const char *stringFromLogType(const enum LogType lt)
 {
   static const char *strings[] = {"INFO", "WARN", "ERROR", "PASS", "FAIL", "CRITICAL", "DEBUG"};
   return strings[lt];
@@ -326,7 +326,7 @@ static const char *stringFromLogType(enum LogType lt)
 /**
    Print message to Serial console
 */
-void message(String msg, enum LogType lt) {
+void message(const String msg, const enum LogType lt) {
   if (MESSAGE_OPT) {
     if (msg.length() == 0) {
       Serial.println(msg);
@@ -550,7 +550,7 @@ int getInsideThermometer() {
 /***
 
 */
-void saveOutsideThermometerIndex(int newIndex) {
+void saveOutsideThermometerIndex(const int newIndex) {
   save_setting("/outTmpIndex", String(newIndex));
   outsideThermometerIndex = read_setting("/outTmpIndex").toInt();
 }
@@ -558,7 +558,7 @@ void saveOutsideThermometerIndex(int newIndex) {
 /**
    Get Temperature
 */
-float getTemperature(int dev/*=0*/) {
+float getTemperature(const int dev/*=0*/) {
   //message("Requesting device " + String(dev), DEBUG);
   sensor.setWaitForConversion(false);   // makes it async
   sensor.requestTemperatures();
@@ -687,7 +687,7 @@ String get_thermometers_addr() {
 /**
   Convert Dallas Address to String
 */
-String getAddressString(DeviceAddress deviceAddress) {
+String getAddressString(const DeviceAddress deviceAddress) {
   String ret = "";
   uint8_t i;
   for (i = 0; i < 8; i++) {
