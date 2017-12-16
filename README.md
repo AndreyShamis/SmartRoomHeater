@@ -26,9 +26,12 @@ In Smart Heater project used:
 5. Check internet connecitivity, if there is no ping to 8.8.8.8, load will be disabled
 
 ## Release
-- Production Relaease v0.1 29.11.2017
+- Prerelease          v0.3 16.12.2017
+  Integration with https://review.gerrithub.io/
 - Production Relaease v0.2 12.12.2017
+- Production Relaease v0.1 29.11.2017
 
-Integration with https://review.gerrithub.io/
+
+
 Author: Andrey Shamis lolnik@gmail.com
 @andreyshamis
