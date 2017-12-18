@@ -18,11 +18,16 @@ before_install:
   - mv NTPClient-master $HOME/Arduino/libraries/
   - mv Arduino-Temperature-Control-Library-master $HOME/Arduino/libraries/
 install:
-  - arduino --pref "boardsmanager.additional.urls=http://arduino.esp8266.com/stable/package_esp8266com_index.json" --save-prefs
-  - arduino --install-boards esp8266:esp8266 --save-prefs
-  - arduino --install-library "esp8266"
+  - cd /usr/local/share/arduino/hardware
+  - mkdir esp8266com
+  - cd esp8266com
+  - git clone https://github.com/esp8266/Arduino.git esp8266
+  - cd esp8266/tools
+  - python get.py
+  - arduino --board esp8266com:esp8266:generic --save-prefs
+
 script:
-    - arduino --verify --board esp8266:esp8266:generic $PWD/SmartRoomHeater.ino
+    - arduino --verify --board esp8266com:esp8266:generic $PWD/SmartRoomHeater.ino
 notifications:
   email:
     on_success: change  # options: [always|never|change] default: always
