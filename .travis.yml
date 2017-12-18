@@ -24,8 +24,10 @@ install:
   - git clone https://github.com/esp8266/Arduino.git esp8266
   - cd esp8266/tools
   - python get.py
-  - arduino --board esp8266:esp8266:generic --save-prefs
-
+  - arduino --board esp8266com:esp8266:generic --save-prefs
+  - arduino --pref "boardsmanager.additional.urls=http://arduino.esp8266.com/stable/package_esp8266com_index.json" --save-prefs
+  - arduino --install-boards esp8266:esp8266 --save-prefs
+  - arduino --install-library "esp8266"
 script:
     - arduino --verify --board esp8266com:esp8266:generic $PWD/SmartRoomHeater.ino
 notifications:
