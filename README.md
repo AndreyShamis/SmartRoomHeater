@@ -32,6 +32,6 @@ In Smart Heater project used:
 - Production Relaease v0.1 29.11.2017
 
 
-
+Integrated with TRAVIS CI
 Author: Andrey Shamis lolnik@gmail.com
 @andreyshamis
