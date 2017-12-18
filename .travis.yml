@@ -10,7 +10,7 @@ before_install:
 install:
   - arduino --pref "boardsmanager.additional.urls=http://arduino.esp8266.com/stable/package_esp8266com_index.json" --save-prefs
   - arduino --install-boards esp8266:esp8266 --save-prefs
-  - arduino --install-library "DHT sensor library,DallasTemperature,NTPClient,ESP8266Ping"
+  - arduino --install-library "DallasTemperature,NTPClient,ESP8266Ping"
 script:
     - arduino --verify --board esp8266:esp8266:generic $PWD/SmartRoomHeater.ino/
 notifications:
