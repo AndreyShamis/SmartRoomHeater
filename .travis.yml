@@ -31,6 +31,9 @@ install:
   - arduino --pref "boardsmanager.additional.urls=http://arduino.esp8266.com/stable/package_esp8266com_index.json" --save-prefs
   - arduino --install-boards esp8266:esp8266 --save-prefs
 script:
+    - echo "Checking nodeMCU v2 - 1.0"
+    - arduino --verify --board esp8266:esp8266:nodemcuv2:CpuFrequency=80,UploadSpeed=921600,FlashSize=4M3M $PWD/SmartRoomHeater.ino
+    - echo "Checking nodeMCU v0 - 0.9"
     - arduino --verify --board esp8266:esp8266:nodemcuv2:CpuFrequency=80,UploadSpeed=921600,FlashSize=4M3M $PWD/SmartRoomHeater.ino
 notifications:
   email:
