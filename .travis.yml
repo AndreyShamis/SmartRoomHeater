@@ -34,7 +34,7 @@ script:
     - echo "Checking nodeMCU v2 - 1.0"
     - arduino --verify --board esp8266:esp8266:nodemcuv2:CpuFrequency=80,UploadSpeed=921600,FlashSize=4M3M $PWD/SmartRoomHeater.ino
     - echo "Checking nodeMCU v0 - 0.9"
-    - arduino --verify --board esp8266:esp8266:nodemcuv2:CpuFrequency=80,UploadSpeed=921600,FlashSize=4M3M $PWD/SmartRoomHeater.ino
+    - arduino --verify --board esp8266:esp8266:nodemcu:CpuFrequency=80,UploadSpeed=921600,FlashSize=4M3M $PWD/SmartRoomHeater.ino
 notifications:
   email:
     on_success: change  # options: [always|never|change] default: always
