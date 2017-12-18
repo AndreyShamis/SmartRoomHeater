@@ -24,6 +24,7 @@ In Smart Heater project used:
 3. In case temperature value is anomalous the load will be disabled
 4. Watch inside thermometer, the maximum inside temperature is MAX_POSSIBLE_TMP_INSIDE
 5. Check internet connecitivity, if there is no ping to 8.8.8.8, load will be disabled
+6. Add reconnect after X pings failures
 
 ## Release
 - Prerelease          v0.3 16.12.2017

@@ -53,6 +53,7 @@ extern "C" {
 // Custom settings
 #define   CHECK_TMP_INSIDE                  0                       // For disable validation of seconds thermometer use 0
 #define   CHECK_INTERNET_CONNECT            1                       // For disable internet connectiviy check use 0
+#define   RECONNECT_AFTER_FAILS             20
 
 // Thermometer and wire settings
 #define   ONE_WIRE_BUS                      D4                      // D4 2
@@ -123,7 +124,7 @@ float               current_temp_inside       = START_TEMP;
 int                 outsideThermometerIndex   = 0;
 int                 last_disable_epoch        = 0;
 bool                internet_access           = 0;
-
+unsigned short      internet_access_failures  = 0;
 /**
  ****************************************************************************************************
 */
@@ -267,17 +268,7 @@ void loop(void) {
     // Check if not connected , disable all network services, reconnect , enable all network services
     if (WiFi.status() != WL_CONNECTED) {
       message("WIFI DISCONNECTED", FAIL_t);
-      close_all_services();
-      delay(3000);
-      if (wifi_connect()) {
-        timeClient.begin();
-        server_start();
-        delay(200);
-        timeClient.update();
-      } else {
-        message("Cannot reconnect to WIFI... ", FAIL_t);
-        delay(3000);
-      }
+      reconnect_cnv();
     }
   }
 
@@ -287,12 +278,22 @@ void loop(void) {
       internet_access = Ping.ping(pingServer, 2);
       //int avg_time_ms = Ping.averageTime();
       //message("Ping result is " + String(internet_access) + " avg_time_ms:" + String(avg_time_ms), INFO);
+      if (!internet_access) {
+        internet_access_failures++;
+      }
+      else{
+        internet_access_failures=0;
+      }
     }
     if (!internet_access && heaterStatus) {
       disableLoad();
       secure_disabled = true;
       message("No Internet connection. Disabling Load", WARNING);
       delay(3000);
+    }
+    if (internet_access_failures >= RECONNECT_AFTER_FAILS) {
+      internet_access_failures = 0;
+      reconnect_cnv();
     }
   }
   if (counter == 100) {
@@ -312,6 +313,19 @@ void loop(void) {
 }
 
 
+void reconnect_cnv() {
+  close_all_services();
+  delay(3000);
+  if (wifi_connect()) {
+    timeClient.begin();
+    server_start();
+    delay(200);
+    timeClient.update();
+  } else {
+    message("Cannot reconnect to WIFI... ", FAIL_t);
+    delay(3000);
+  }
+}
 
 /**
 
