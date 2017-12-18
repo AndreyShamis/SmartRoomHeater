@@ -11,7 +11,7 @@ before_install:
   - wget -O Arduino-Temperature-Control-Library-master.zip https://github.com/milesburton/Arduino-Temperature-Control-Library/archive/master.zip
   - wget -O NTPClient.zip https://github.com/arduino-libraries/NTPClient/archive/master.zip
   - wget -O ESP8266Ping.zip https://github.com/dancol90/ESP8266Ping/archive/master.zip
-  - unzip ESP8266Ping.zip
+  - unzip Arduino-Temperature-Control-Library-master.zip
   - unzip NTPClient.zip
   - unzip ESP8266Ping.zip
   - mv ESP8266Ping-master $HOME/Arduino/libraries/
