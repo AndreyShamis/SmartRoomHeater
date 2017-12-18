@@ -30,7 +30,6 @@ extern "C" {
 #include "user_interface.h"
 #include "cont.h"
 }
-#include <Time.h>
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 #include <Wire.h>
@@ -813,4 +812,3 @@ void print_all_info() {
 //  ret += "\nAddress : " + getAddressString(insideThermometer[0]) + "</pre>";
 //  return ret;
 //}
-

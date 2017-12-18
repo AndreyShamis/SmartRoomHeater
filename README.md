@@ -4,7 +4,6 @@ This code provide ability to controll Load with Solid State Relay SSR
 
 ## Requirements
 ### Software
-* **Time** https://github.com/PaulStoffregen/Time
 * **DallasTemperature** https://github.com/milesburton/Arduino-Temperature-Control-Library
 * **NTPClient** https://github.com/arduino-libraries/NTPClient
 * **ESP8266Ping** https://github.com/dancol90/ESP8266Ping
