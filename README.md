@@ -1,6 +1,8 @@
+
 # Smart Room Heater
 This code provide ability to controll Load with Solid State Relay SSR
-
+# Continuous Integration
+[![Build Status](https://travis-ci.org/AndreyShamis/SmartRoomHeater.svg?branch=master)](https://travis-ci.org/AndreyShamis/SmartRoomHeater)
 
 ## Requirements
 ### Software
