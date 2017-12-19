@@ -292,6 +292,7 @@ void loop(void) {
       delay(3000);
     }
     if (internet_access_failures >= RECONNECT_AFTER_FAILS) {
+      message("No Internet connection. internet_access_failures FLAG, reconnecting all.", CRITICAL);
       internet_access_failures = 0;
       reconnect_cnv();
     }
