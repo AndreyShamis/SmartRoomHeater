@@ -31,6 +31,8 @@ In Smart Heater project used:
 - Production Relaease v0.2 12.12.2017
 - Production Relaease v0.1 29.11.2017
 
+## Core review
+For code review used https://review.gerrithub.io
 
 Integrated with TRAVIS CI
 Author: Andrey Shamis lolnik@gmail.com
