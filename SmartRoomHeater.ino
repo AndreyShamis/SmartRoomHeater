@@ -307,7 +307,7 @@ void loop(void) {
   //ESP.deepSleep(sleepTimeS * 1000000, RF_DEFAULT);
   delay(LOOP_DELAY);
   counter++;
-  if (counter >= 12000) {
+  if (counter >= 16000) {
     counter = 0;
     //printTemperatureToSerial();
   }
