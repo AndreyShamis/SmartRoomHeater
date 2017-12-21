@@ -53,7 +53,7 @@ extern "C" {
 // Custom settings
 #define   CHECK_TMP_INSIDE                  0                       // For disable validation of seconds thermometer use 0
 #define   CHECK_INTERNET_CONNECT            1                       // For disable internet connectiviy check use 0
-#define   RECONNECT_AFTER_FAILS             20
+#define   RECONNECT_AFTER_FAILS             100                     // 20 = ~1 min -> 100 =~ 4min
 
 // Thermometer and wire settings
 #define   ONE_WIRE_BUS                      D4                      // D4 2
