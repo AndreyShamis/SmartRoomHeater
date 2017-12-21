@@ -3,10 +3,12 @@ before_install:
   - "/sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_1.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :1 -ac -screen 0 1280x1024x16"
   - sleep 3
   - export DISPLAY=:1.0
+  - echo " ####################### Installing ARDUINO #######################"
   - wget http://downloads.arduino.cc/arduino-1.8.5-linux64.tar.xz
   - tar xf arduino-1.8.5-linux64.tar.xz
   - sudo mv arduino-1.8.5 /usr/local/share/arduino
   - sudo ln -s /usr/local/share/arduino/arduino /usr/local/bin/arduino
+  - echo " ####################### Installing libraries #######################"
   - mkdir -p $HOME/Arduino/libraries
   - wget -O Arduino-Temperature-Control-Library-master.zip https://github.com/milesburton/Arduino-Temperature-Control-Library/archive/master.zip
   - wget -O NTPClient.zip https://github.com/arduino-libraries/NTPClient/archive/master.zip
@@ -17,7 +19,7 @@ before_install:
   - mv ESP8266Ping-master $HOME/Arduino/libraries/
   - mv NTPClient-master $HOME/Arduino/libraries/
   - mv Arduino-Temperature-Control-Library-master $HOME/Arduino/libraries/
-install:
+  - echo " ####################### Installing esp8266 #######################"
   - CURRENT_DIR=$PWD
   - echo "Current location " ${CURRENT_DIR}
   - cd /usr/local/share/arduino/hardware
@@ -27,17 +29,22 @@ install:
   - cd esp8266/tools
   - python get.py
   - cd ${CURRENT_DIR}
+install:
   - arduino --board esp8266com:esp8266:generic --save-prefs
   - arduino --pref "boardsmanager.additional.urls=http://arduino.esp8266.com/stable/package_esp8266com_index.json" --save-prefs
   - arduino --install-boards esp8266:esp8266 --save-prefs
 script:
-    - echo "#################################################################################"
-    - echo ""
+    - echo "\n###############################################################\n"
     - echo "Checking ${BOARD}"
     - arduino --verify --board ${BOARD} $PWD/SmartRoomHeater.ino
 env:
-    - BOARD=esp8266:esp8266:nodemcuv2:CpuFrequency=80,UploadSpeed=921600,FlashSize=4M3M #nodeMCU v2 - 1.0
-    - BOARD=esp8266:esp8266:nodemcu:CpuFrequency=80,UploadSpeed=921600,FlashSize=4M3M   #nodeMCU v0 - 0.9
+  global:
+    - BOARD_NODEMCU_SETTINGS=CpuFrequency=80,UploadSpeed=921600,FlashSize=4M3M
+    - BOARD_NODEMCUV2=esp8266:esp8266:nodemcuv2:${BOARD_NODEMCU_SETTINGS} #nodeMCU v2 - 1.0
+    - BOARD_NODEMCUV1=esp8266:esp8266:nodemcu:${BOARD_NODEMCU_SETTINGS}   #nodeMCU v0 - 0.9
+  matrix:
+    - BOARD=${BOARD_NODEMCUV2}
+    - BOARD=${BOARD_NODEMCUV1}
 notifications:
   email:
     on_success: change  # options: [always|never|change] default: always
