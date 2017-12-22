@@ -9,6 +9,9 @@ This code provide ability to controll Load with Solid State Relay SSR
 * **DallasTemperature** https://github.com/milesburton/Arduino-Temperature-Control-Library
 * **NTPClient** https://github.com/arduino-libraries/NTPClient
 * **ESP8266Ping** https://github.com/dancol90/ESP8266Ping
+### Scheme
+https://easyeda.com/normal/SmartRoomHeater_Scheme-ce48bbb9c10f4db7baa1a9dd215906da
+https://easyeda.com/editor#id=ce48bbb9c10f4db7baa1a9dd215906da
 
 #### Software installation
 Put folders from downloaded archives under _/home/USER/Arduino/libraries/_
@@ -33,7 +36,7 @@ In Smart Heater project used:
 - Production Relaease v0.2 12.12.2017
 - Production Relaease v0.1 29.11.2017
 
-## Core review
+## Code review
 For code review used https://review.gerrithub.io
 
 Integrated with TRAVIS CI
