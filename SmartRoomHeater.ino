@@ -9,28 +9,16 @@
     Security:
         1. On WiFi disconnect the load will be disabled(KEEP mode only)
         2. Delay between disable to enable- default 60 seconds(KEEP mode only)
-        3, In case temperature value is anomalous the load will be disabled
+        3. In case temperature value is anomalous the load will be disabled
         4. Watch inside thermometer, the maximum inside temperature is MAX_POSSIBLE_TMP_INSIDE
         5. Check internet connecitivity, if there is no ping to 8.8.8.8, load will be disabled
-
-    Production Relaease v0.2 12.12.2017
-
+        6. Add reconnect after X pings failures
 
     Author: Andrey Shamis lolnik@gmail.com
 
 
 */
 
-//deep sleep include
-extern "C" {
-#include "ets_sys.h"
-#include "os_type.h"
-#include "osapi.h"
-#include "mem.h"
-#include "user_interface.h"
-#include "cont.h"
-}
-//#include <Time.h>
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 #include <Wire.h>
