@@ -60,7 +60,7 @@
 
 #define   UART_BAUD_RATE                    921600
 
-#define   LOOP_DELAY                        100                     // Wait each loop for LOOP_DELAY
+#define   LOOP_DELAY                        50                      // Wait each loop for LOOP_DELAY
 // Unchangeable settings
 #define   START_TEMP                        -10                     // Default value for temperature variables on start
 #define   INCORRECT_EPOCH                   200000                  // Minimum value for time epoch
@@ -78,6 +78,7 @@
 #define COUNTER_IN_LOOP_SECOND              (int)(1000/LOOP_DELAY)
 #define CHECK_OUTSIDE_TMP_COUNTER           (int)(COUNTER_IN_LOOP_SECOND*3)
 #define CHECK_INTERNAL_COUNTER              (CHECK_OUTSIDE_TMP_COUNTER*5)
+#define NTP_UPDATE_COUNTER                  (COUNTER_IN_LOOP_SECOND*60*3)
 #define CHECK_INTERNET_CONNECTIVITY_CTR     (COUNTER_IN_LOOP_SECOND*120)
 
 /**
@@ -236,7 +237,7 @@ void loop(void) {
     }
   }
 
-  if (current_temp < MIN_INCORRECT_TMP || current_temp >=MAX_INCORRECT_TMP) {
+  if (current_temp < MIN_INCORRECT_TMP || current_temp >= MAX_INCORRECT_TMP) {
     message("Disabling Load. Very LOW temperatute. " + String(current_temp), CRITICAL);
     disableLoad();
     secure_disabled = true;
@@ -277,8 +278,8 @@ void loop(void) {
       if (!internet_access) {
         internet_access_failures++;
       }
-      else{
-        internet_access_failures=0;
+      else {
+        internet_access_failures = 0;
       }
     }
     if (!internet_access && heaterStatus) {
@@ -294,11 +295,13 @@ void loop(void) {
     }
   }
   if (counter == 20) {
+    print_all_info();
+
+  }
+  if (counter % NTP_UPDATE_COUNTER == 0) {
     if (internet_access) {
       update_time();
     }
-
-    print_all_info();
   }
   //ESP.deepSleep(sleepTimeS * 1000000, RF_DEFAULT);
   delay(LOOP_DELAY);
@@ -539,16 +542,18 @@ void update_time() {
       timeClient.forceUpdate();
       timeClient.update();
       if (timeClient.getEpochTime() < INCORRECT_EPOCH) {
-        delay(100);
+        delay(1000);
       }
       else {
-        return;
+        break;
       }
     }
   }
   else {
+    timeClient.forceUpdate();
     timeClient.update();
   }
+  message("Time updated." , PASS);
 }
 
 /**
