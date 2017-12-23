@@ -1,20 +1,21 @@
 /**
-   This code provide ability to controll Load with Solid State Relay SSR
-   In Smart Heater project used:
+    This code provide ability to control Load with Solid State Relay SSR
+    In Smart Heater project used:
 
-        2 * DS1822+   https://datasheets.maximintegrated.com/en/ds/DS1822.pdf  9-12bit  -55-125
-        1 * NodeMCU
-        1 * Solid state Relay FOTEK SSR-25 DA
-        1 * 220v to 5v USB PS
+      2 * DS1822+   https://datasheets.maximintegrated.com/en/ds/DS1822.pdf  9-12bit  -55-125
+      1 * nodeMCU
+      1 * Solid state Relay FOTEK SSR-25 DA
+      1 * 220v to 5v USB PS
     Security:
-        1. On WiFi disconnect the load will be disabled(KEEP mode only)
-        2. Delay between disable to enable- default 60 seconds(KEEP mode only)
-        3. In case temperature value is anomalous the load will be disabled
-        4. Watch inside thermometer, the maximum inside temperature is MAX_POSSIBLE_TMP_INSIDE
-        5. Check internet connecitivity, if there is no ping to 8.8.8.8, load will be disabled
-        6. Add reconnect after X pings failures
+      1. On WiFi disconnect the load will be disabled(KEEP mode only)
+      2. Delay between disable to enable- default 60 seconds(KEEP mode only)
+      3. In case temperature value is anomalous the load will be disabled
+      4. Watch inside thermometer, the maximum inside temperature is MAX_POSSIBLE_TMP_INSIDE
+      5. Check Internet connectivity, if there is no ping to 8.8.8.8, load will be disabled
+      6. Add reconnect after X pings failures
+      7. Added \_FLAG_FORCE_TMP_CHECK, When true will cause to immediately check, used also when thermometer wire were troubled
 
-    Author: Andrey Shamis lolnik@gmail.com
+    Author: Andrey Shamis lolnik@gmail.com @AndreyShamis
 
 
 */
@@ -42,6 +43,10 @@
 #define   CHECK_TMP_INSIDE                  0                       // For disable validation of seconds thermometer use 0
 #define   CHECK_INTERNET_CONNECT            1                       // For disable internet connectiviy check use 0
 #define   RECONNECT_AFTER_FAILS             100                     // 20 = ~1 min -> 100 =~ 4min
+#define   MAX_POSSIBLE_TMP                  26                      // MAX possible temp outside
+#define   MAX_POSSIBLE_TMP_INSIDE           35                      // MAX possible temp inside - depends on disctance between SSR to the Thermometer
+#define   MAX_INCORRECT_TMP                 50                      // Usally when Vcc disconnected the tmp will be 85
+#define   MIN_INCORRECT_TMP                 -1                      // Usally when GND or DATA disconnected the tmp will be -127
 
 // Thermometer and wire settings
 #define   ONE_WIRE_BUS                      D4                      // D4 2
@@ -55,7 +60,7 @@
 
 #define   UART_BAUD_RATE                    921600
 
-#define   LOOP_DELAY                        10                      // Wait each loop for LOOP_DELAY
+#define   LOOP_DELAY                        100                     // Wait each loop for LOOP_DELAY
 // Unchangeable settings
 #define   START_TEMP                        -10                     // Default value for temperature variables on start
 #define   INCORRECT_EPOCH                   200000                  // Minimum value for time epoch
@@ -103,8 +108,7 @@ const char          *ssid                     = WIFI_SSID;
 const char          *password                 = WIFI_PASS;
 int                 counter                   = 0;
 bool                heaterStatus              = 0;
-float               MAX_POSSIBLE_TMP          = 26;
-float               MAX_POSSIBLE_TMP_INSIDE   = 35;
+bool                _FLAG_FORCE_TMP_CHECK     = true;         //  When true will cause to immediately check
 bool                secure_disabled           = false;
 float               temperatureKeep           = 22;
 float               current_temp              = START_TEMP;
@@ -186,8 +190,9 @@ void loop(void) {
   server.handleClient();
 
   // Check temperature for thermometer outside
-  if (counter % CHECK_OUTSIDE_TMP_COUNTER == 0) {
+  if (counter % CHECK_OUTSIDE_TMP_COUNTER == 0 || _FLAG_FORCE_TMP_CHECK) {
     current_temp = getTemperature(outsideThermometerIndex);
+    _FLAG_FORCE_TMP_CHECK = false;
   }
   // Check temperature for thermometer inside
   if (counter % CHECK_INTERNAL_COUNTER == 0) {
@@ -231,16 +236,19 @@ void loop(void) {
     }
   }
 
-  if (current_temp < 1) {
-    message("Disabling Load. Very LOW temperatute. " + String(current_temp), WARNING);
+  if (current_temp < MIN_INCORRECT_TMP || current_temp >=MAX_INCORRECT_TMP) {
+    message("Disabling Load. Very LOW temperatute. " + String(current_temp), CRITICAL);
     disableLoad();
     secure_disabled = true;
+    delay(300);
+    _FLAG_FORCE_TMP_CHECK = true;
   }
 
-  if (CHECK_TMP_INSIDE && current_temp_inside < 1) {
-    message("Disabling Load. Very LOW temperatute INSIDE. " + String(current_temp_inside), WARNING);
+  if (CHECK_TMP_INSIDE && current_temp_inside < MIN_INCORRECT_TMP) {
+    message("Disabling Load. Very LOW temperatute INSIDE. " + String(current_temp_inside), CRITICAL);
     disableLoad();
     secure_disabled = true;
+    delay(300);
   }
 
 
@@ -285,7 +293,7 @@ void loop(void) {
       reconnect_cnv();
     }
   }
-  if (counter == 100) {
+  if (counter == 20) {
     if (internet_access) {
       update_time();
     }
@@ -531,7 +539,7 @@ void update_time() {
       timeClient.forceUpdate();
       timeClient.update();
       if (timeClient.getEpochTime() < INCORRECT_EPOCH) {
-        delay(1000);
+        delay(100);
       }
       else {
         return;
@@ -750,56 +758,10 @@ String read_setting(const char* fname) {
 */
 void print_all_info() {
   message("", INFO);
-  message("Heater status: " + String(heaterStatus), INFO);
+  message("Heater status: " + String(heaterStatus) + " |HostName: " + WiFi.hostname() + " |Ch: " + String(WiFi.channel()) + " |RSSI: " + WiFi.RSSI() + " |MAC: " + WiFi.macAddress(), INFO);
   message("Flash Chip Id/Size/Speed/Mode: " + String(ESP.getFlashChipId()) + "/" + String(ESP.getFlashChipSize()) + "/" + String(ESP.getFlashChipSpeed()) + "/" + String(ESP.getFlashChipMode()), INFO);
   message("SdkVersion: " + String(ESP.getSdkVersion()) + "\tCoreVersion: " + ESP.getCoreVersion() + "\tBootVersion: " + ESP.getBootVersion(), INFO);
   message("CpuFreqMHz: " + String(ESP.getCpuFreqMHz()) + " \tBootMode: " + String(ESP.getBootMode()) + "\tSketchSize: " + String(ESP.getSketchSize()) + "\tFreeSketchSpace: " + String(ESP.getFreeSketchSpace()), INFO);
-  message("HostName: " + WiFi.hostname() + "\tChannel: " + String(WiFi.channel()) + "\tRSSI: " + WiFi.RSSI() + "\tmacAddress: " + WiFi.macAddress(), INFO);
-
-
-  //message("getResetReason: " + ESP.getResetReason(), INFO);
-  //message("getResetInfo: " + ESP.getResetInfo(), INFO);
-  //message("Address : " + getAddressString(insideThermometer[0]), INFO);
-  //Serial.println(timeClient.getFormattedTime()); //Serial.println(timeClient.getEpochTime());
-  //Serial.println("INFO: -----------------------------------------------------------------------");
-  //Serial.println("Heater status: " + String(heaterStatus));
-  //Serial.println("getFlashChipId: " + String(ESP.getFlashChipId()) + "\t\t getFlashChipSize: " + String(ESP.getFlashChipSize()));
-  //Serial.println("getFlashChipSpeed: " + String(ESP.getFlashChipSpeed()) + "\t getFlashChipMode: " + String(ESP.getFlashChipMode()));
-  //Serial.println("getSdkVersion: " + String(ESP.getSdkVersion()) + "\t getCoreVersion: " + ESP.getCoreVersion() + "\t\t getBootVersion: " + ESP.getBootVersion());
-  //Serial.println("getCpuFreqMHz: " + String(ESP.getCpuFreqMHz()) + " \t getBootMode: " + String(ESP.getBootMode()));
-  //Serial.println("HostName :" + WiFi.hostname() + "\tmacAddress: " + WiFi.macAddress() + "\t Channel : " + String(WiFi.channel()) + "\t\t\t RSSI: " + WiFi.RSSI());
-  //Serial.println("getSketchSize: " + String(ESP.getSketchSize()) + "\t\t getFreeSketchSpace: " + String(ESP.getFreeSketchSpace()));
-  //Serial.println("getResetReason: " + ESP.getResetReason());
-  //Serial.println("getResetInfo: " + ESP.getResetInfo());
-  //Serial.println("Address : " + getAddressString(insideThermometer[0]));
+  //message("getResetReason: " + ESP.getResetReason() + " |getResetInfo: " + ESP.getResetInfo() + " |Address : " + getAddressString(insideThermometer[0]), INFO);
 }
-
-/**
- ****************************************************************************************************
-*/
-//const int   sleepTimeS              = 10;  // Time to sleep (in seconds):
-//enum ADCMode {
-//    ADC_TOUT = 33,
-//    ADC_TOUT_3V3 = 33,
-//    ADC_VCC = 255,
-//    ADC_VDD = 255
-//};
-
-///**
-//
-//*/
-//String build_device_info() {
-//  String ret = "<pre>\t\t\t Heater status: " + String(heaterStatus);
-//  ret += "\ngetFlashChipId: " + String(ESP.getFlashChipId()) + "\t\t getFlashChipSize: " + String(ESP.getFlashChipSize());
-//  ret += "\ngetFlashChipSpeed: " + String(ESP.getFlashChipSpeed()) + "\t getFlashChipMode: " + String(ESP.getFlashChipMode());
-//  ret += "\ngetSdkVersion: " + String(ESP.getSdkVersion()) + "\t getCoreVersion: " + ESP.getCoreVersion() + "\t\t getBootVersion: " + ESP.getBootVersion();
-//  ret += "\ngetBootMode: " + String(ESP.getBootMode());
-//  ret += "\ngetCpuFreqMHz: " + String(ESP.getCpuFreqMHz());
-//  ret += "\nmacAddress: " + WiFi.macAddress() + "\t Channel : " + String(WiFi.channel()) + "\t\t\t RSSI: " + WiFi.RSSI();
-//  ret += "\ngetSketchSize: " + String(ESP.getSketchSize()) + "\t\t getFreeSketchSpace: " + String(ESP.getFreeSketchSpace());
-//  //ret += "\ngetResetReason: " + ESP.getResetReason();
-//  //ret += "\ngetResetInfo: " + ESP.getResetInfo();
-//  ret += "\nAddress : " + getAddressString(insideThermometer[0]) + "</pre>";
-//  return ret;
-//}
 
