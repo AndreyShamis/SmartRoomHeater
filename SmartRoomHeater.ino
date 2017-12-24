@@ -277,6 +277,7 @@ void loop(void) {
       //message("Ping result is " + String(internet_access) + " avg_time_ms:" + String(avg_time_ms), INFO);
       if (!internet_access) {
         internet_access_failures++;
+        delay(500);
       }
       else {
         internet_access_failures = 0;
