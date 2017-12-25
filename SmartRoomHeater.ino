@@ -397,14 +397,14 @@ bool wifi_connect() {
   message("Connecting to [" + String(ssid) + "][" + String(password) + "]...", INFO);
   int con_counter = 0;
   while (WiFi.status() != WL_CONNECTED) {
-    delay(100);
+    delay(200);
     Serial.print(".");
     con_counter++;
     if (con_counter % 20 == 0) {
       message("", INFO);
       message("Still connecting...", WARNING);
     }
-    if (con_counter == 100) {
+    if (con_counter == 150) {
       message("", INFO);
       message("Cannot connect to [" + String(ssid) + "] ", FAIL_t);
       WiFi.disconnect();
