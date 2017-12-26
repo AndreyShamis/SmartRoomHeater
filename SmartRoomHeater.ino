@@ -44,7 +44,7 @@
 #define   CHECK_INTERNET_CONNECT            1                       // For disable internet connectiviy check use 0
 #define   RECONNECT_AFTER_FAILS             100                     // 20 = ~1 min -> 100 =~ 4min
 #define   MAX_POSSIBLE_TMP                  26                      // MAX possible temp outside
-#define   MAX_POSSIBLE_TMP_INSIDE           35                      // MAX possible temp inside - depends on disctance between SSR to the Thermometer
+#define   MAX_POSSIBLE_TMP_INSIDE           36                      // MAX possible temp inside - depends on disctance between SSR to the Thermometer
 #define   MAX_INCORRECT_TMP                 50                      // Usally when Vcc disconnected the tmp will be 85
 #define   MIN_INCORRECT_TMP                 -1                      // Usally when GND or DATA disconnected the tmp will be -127
 
