@@ -40,7 +40,7 @@
 
 #define   MESSAGE_OPT                       1
 // Custom settings
-#define   CHECK_TMP_INSIDE                  0                       // For disable validation of seconds thermometer use 0
+#define   CHECK_TMP_INSIDE                  1                       // For disable validation of seconds thermometer use 0
 #define   CHECK_INTERNET_CONNECT            1                       // For disable internet connectiviy check use 0
 #define   RECONNECT_AFTER_FAILS             100                     // 20 = ~1 min -> 100 =~ 4min
 #define   MAX_POSSIBLE_TMP                  26                      // MAX possible temp outside
@@ -316,20 +316,58 @@ void loop(void) {
 
 void reconnect_cnv() {
   close_all_services();
-  delay(3000);
+  delay(1000);
   if (wifi_connect()) {
     timeClient.begin();
     server_start();
     delay(200);
-    timeClient.update();
+    update_time();
   } else {
     message("Cannot reconnect to WIFI... ", FAIL_t);
-    delay(3000);
+    delay(1000);
   }
 }
 
 /**
+   Set WiFi connection and connect
+*/
+bool wifi_connect() {
+  WiFi.mode(WIFI_STA);       //  Disable AP Mode - set mode to WIFI_AP, WIFI_STA, or WIFI_AP_STA.
+  WiFi.begin(ssid, password);
 
+  // Wait for connection
+  message("Connecting to [" + String(ssid) + "][" + String(password) + "]...", INFO);
+  int con_counter = 0;
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(200);
+    Serial.print(".");
+    con_counter++;
+    if (con_counter % 20 == 0) {
+      message("", INFO);
+      message("Still connecting...", WARNING);
+    }
+    if (con_counter == 150) {
+      message("", INFO);
+      message("Cannot connect to [" + String(ssid) + "] ", FAIL_t);
+      WiFi.disconnect();
+      message(" ----> Disabling WiFi...", INFO);
+      WiFi.mode(WIFI_OFF);
+      return false;
+    }
+  }
+  message("", INFO);
+  message("Connected to [" + String(ssid) + "]  IP address: " + WiFi.localIP().toString(), PASS);
+  //  Serial.print("PASS: );
+  //  Serial.println(WiFi.localIP());
+  if (MDNS.begin("esp8266")) {
+    message("MDNS responder started", PASS);
+  }
+  message("-----------------------------------", INFO);
+  return true;
+}
+
+/**
+  Keep type of mesages
 */
 //static inline char *stringFromLogType(enum LogType lt)
 static const char *stringFromLogType(const enum LogType lt)
@@ -386,43 +424,6 @@ void server_start() {
   message("HTTP server started", PASS);
 }
 
-/**
-   Set WiFi connection and connect
-*/
-bool wifi_connect() {
-  WiFi.mode(WIFI_STA);       //  Disable AP Mode - set mode to WIFI_AP, WIFI_STA, or WIFI_AP_STA.
-  WiFi.begin(ssid, password);
-
-  // Wait for connection
-  message("Connecting to [" + String(ssid) + "][" + String(password) + "]...", INFO);
-  int con_counter = 0;
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(200);
-    Serial.print(".");
-    con_counter++;
-    if (con_counter % 20 == 0) {
-      message("", INFO);
-      message("Still connecting...", WARNING);
-    }
-    if (con_counter == 150) {
-      message("", INFO);
-      message("Cannot connect to [" + String(ssid) + "] ", FAIL_t);
-      WiFi.disconnect();
-      message(" ----> Disabling WiFi...", INFO);
-      WiFi.mode(WIFI_OFF);
-      return false;
-    }
-  }
-  message("", INFO);
-  message("Connected to [" + String(ssid) + "]  IP address: " + WiFi.localIP().toString(), PASS);
-  //  Serial.print("PASS: );
-  //  Serial.println(WiFi.localIP());
-  if (MDNS.begin("esp8266")) {
-    message("MDNS responder started", PASS);
-  }
-  message("-----------------------------------", INFO);
-  return true;
-}
 
 /**
   Close all network services
