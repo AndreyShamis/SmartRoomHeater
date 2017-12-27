@@ -40,6 +40,7 @@ In Smart Heater project used:
 
 ## Release
 Releases and pre-releases can be found here https://github.com/AndreyShamis/SmartRoomHeater/releases
+Production release v0.5
 
 ## Code review
 For code review used https://review.gerrithub.io

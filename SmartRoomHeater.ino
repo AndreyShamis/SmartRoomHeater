@@ -314,7 +314,7 @@ void loop(void) {
 }
 
 /**
- *  
+ *  Reconnect to wifi - in success enable all services and update time
  */
 void reconnect_cnv() {
   close_all_services();
