@@ -62,7 +62,6 @@ success "_####################### Installing esp8266 in arduino _###############
 ./${ARDUINO_V_FOLDER}/arduino --pref "boardsmanager.additional.urls=http://arduino.esp8266.com/stable/package_esp8266com_index.json" --save-prefs
 ./${ARDUINO_V_FOLDER}/arduino --install-boards esp8266:esp8266 --save-prefs
 
-
 export BOARD_NODEMCU_SETTINGS=CpuFrequency=80,UploadSpeed=921600,FlashSize=4M3M
 export BOARD_NODEMCUV2=esp8266:esp8266:nodemcuv2:${BOARD_NODEMCU_SETTINGS} #nodeMCU v2 - 1.0
 export BOARD=${BOARD_NODEMCUV2}
@@ -72,3 +71,4 @@ echo "Checking ${BOARD}"
 ./${ARDUINO_V_FOLDER}/arduino --verify --board ${BOARD} --verbose SmartRoomHeater.ino
 
 #./${ARDUINO_V_FOLDER}/arduino-builder -compile -logger=machine -hardware /var/lib/jenkins/workspaces/SmartRoomHeater/31/arduino-1.8.5/hardware -tools /var/lib/jenkins/workspaces/SmartRoomHeater/31/arduino-1.8.5/tools-builder -tools /var/lib/jenkins/workspaces/SmartRoomHeater/31/arduino-1.8.5/hardware/tools/avr -built-in-libraries /var/lib/jenkins/workspaces/SmartRoomHeater/31/arduino-1.8.5/libraries -libraries /var/lib/jenkins/Arduino/libraries -fqbn=esp8266:esp8266:nodemcuv2:CpuFrequency=80,UploadSpeed=921600,FlashSize=4M3M -ide-version=10805  -warnings=null -prefs=preferences-file=/var/lib/jenkins/workspaces/SmartRoomHeater/31/.arduino/preferences.txt -libraries=/var/lib/jenkins/workspaces/SmartRoomHeater/31/Arduino/libraries -prefs=build.warn_data_percentage=75  -verbose SmartRoomHeater.ino
+echo "Finish ${BOARD}\n\n"
