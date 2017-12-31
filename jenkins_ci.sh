@@ -9,18 +9,18 @@ error() {
 success() {
   echo "\033[1;32m[Success] $1 \033[0m"
 }
-
+#export HOME=$(pwd)
 export ARDUINO_V="1.8.5"
 export ARDUINO_V_FOLDER="arduino-${ARDUINO_V}"
 export ARDUINO_TAR="${ARDUINO_V_FOLDER}-linux64.tar.xz"
 export PATH_TO_TAR="../${ARDUINO_TAR}"
-export ARDUINO_LIB="${JENKINS_HOME}/Arduino/libraries/"
-rm -rf  "${JENKINS_HOME}/.arduino15"
-rm -rf "${JENKINS_HOME}/Arduino"
+export ARDUINO_LIB="${HOME}/Arduino/libraries/"
+rm -rf  "${HOME}/.arduino15"
+rm -rf "${HOME}/Arduino"
 success "WORKSPACE is ${WORKSPACE}"
 
 success "Starting X server "
-/sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_1.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :1 -ac -screen 0 1280x1024x16
+/sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_1_${NODE_NAME}.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :1 -ac -screen 0 1280x1024x16
 sleep 2
 export DISPLAY=:1.0
 
@@ -61,6 +61,7 @@ success "_####################### Installing esp8266 in arduino _###############
 ./${ARDUINO_V_FOLDER}/arduino --board esp8266com:esp8266:generic --save-prefs
 ./${ARDUINO_V_FOLDER}/arduino --pref "boardsmanager.additional.urls=http://arduino.esp8266.com/stable/package_esp8266com_index.json" --save-prefs
 ./${ARDUINO_V_FOLDER}/arduino --install-boards esp8266:esp8266 --save-prefs
+
 
 export BOARD_NODEMCU_SETTINGS=CpuFrequency=80,UploadSpeed=921600,FlashSize=4M3M
 export BOARD_NODEMCUV2=esp8266:esp8266:nodemcuv2:${BOARD_NODEMCU_SETTINGS} #nodeMCU v2 - 1.0
