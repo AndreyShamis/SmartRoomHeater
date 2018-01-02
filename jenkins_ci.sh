@@ -9,12 +9,18 @@ error() {
 success() {
   echo "\033[1;32m[Success] $1 \033[0m"
 }
-#export HOME=$(pwd)
+
 export ARDUINO_V="1.8.5"
+export NODEMCU_ARDUINO_PKG_URL="http://arduino.esp8266.com/stable/package_esp8266com_index.json"
 export ARDUINO_V_FOLDER="arduino-${ARDUINO_V}"
 export ARDUINO_TAR="${ARDUINO_V_FOLDER}-linux64.tar.xz"
 export PATH_TO_TAR="../${ARDUINO_TAR}"
 export ARDUINO_LIB="${HOME}/Arduino/libraries/"
+
+export BOARD_NODEMCU_SETTINGS=CpuFrequency=80,UploadSpeed=921600,FlashSize=4M3M
+export BOARD_NODEMCUV2=esp8266:esp8266:nodemcuv2:${BOARD_NODEMCU_SETTINGS} #nodeMCU v2 - 1.0
+export BOARD=${BOARD_NODEMCUV2}
+
 rm -rf  "${HOME}/.arduino15"
 rm -rf "${HOME}/Arduino"
 success "WORKSPACE is ${WORKSPACE}"
@@ -59,13 +65,10 @@ cd ${CURRENT_DIR}
 
 success "_####################### Installing esp8266 in arduino _#######################"
 ./${ARDUINO_V_FOLDER}/arduino --board esp8266com:esp8266:generic --save-prefs
-./${ARDUINO_V_FOLDER}/arduino --pref "boardsmanager.additional.urls=http://arduino.esp8266.com/stable/package_esp8266com_index.json" --save-prefs
+./${ARDUINO_V_FOLDER}/arduino --pref "boardsmanager.additional.urls=${NODEMCU_ARDUINO_PKG_URL}" --save-prefs
 ./${ARDUINO_V_FOLDER}/arduino --install-boards esp8266:esp8266 --save-prefs
 
 
-export BOARD_NODEMCU_SETTINGS=CpuFrequency=80,UploadSpeed=921600,FlashSize=4M3M
-export BOARD_NODEMCUV2=esp8266:esp8266:nodemcuv2:${BOARD_NODEMCU_SETTINGS} #nodeMCU v2 - 1.0
-export BOARD=${BOARD_NODEMCUV2}
 
 echo "\n###############################################################\n"
 echo "Checking ${BOARD}"
