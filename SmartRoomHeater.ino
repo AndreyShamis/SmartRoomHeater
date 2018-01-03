@@ -40,7 +40,7 @@
 
 #define   MESSAGE_OPT                       1
 // Custom settings
-#define   CHECK_TMP_INSIDE                  1                       // For disable validation of seconds thermometer use 0
+#define   CHECK_TMP_INSIDE                  0                       // For disable validation of seconds thermometer use 0
 #define   CHECK_INTERNET_CONNECT            1                       // For disable internet connectiviy check use 0
 #define   RECONNECT_AFTER_FAILS             100                     // 20 = ~1 min -> 100 =~ 4min
 #define   MAX_POSSIBLE_TMP                  26                      // MAX possible temp outside
@@ -54,7 +54,7 @@
 #define   TEMPERATURE_PRECISION             12                      // Possible value 9-12
 
 // NTP settings
-#define   NTP_SERVER                        "0.asia.pool.ntp.org"   // Pool of ntp server http://www.pool.ntp.org/zone/asia
+#define   NTP_SERVER                        "1.asia.pool.ntp.org"   // Pool of ntp server http://www.pool.ntp.org/zone/asia
 #define   NTP_TIME_OFFSET_SEC               10800                   // Time offset
 #define   NTP_UPDATE_INTERVAL_MS            60000                   // NTP Update interval - 1 min
 
@@ -539,14 +539,15 @@ String build_index() {
 void update_time() {
   if (timeClient.getEpochTime() < INCORRECT_EPOCH) {
     unsigned short counter_tmp = 0;
-    while (timeClient.getEpochTime() < INCORRECT_EPOCH && counter_tmp < 5) {
+    while (timeClient.getEpochTime() < INCORRECT_EPOCH && counter_tmp < 10) {
       message("Incorrect time, trying to update: #:" + String(counter_tmp) , CRITICAL);
       counter_tmp++;
       timeClient.update();
       timeClient.forceUpdate();
       timeClient.update();
       if (timeClient.getEpochTime() < INCORRECT_EPOCH) {
-        delay(1000);
+        delay(1000 + 500 * counter_tmp);
+        yield();
       }
       else {
         break;
@@ -773,4 +774,5 @@ void print_all_info() {
   message("CpuFreqMHz: " + String(ESP.getCpuFreqMHz()) + " \tBootMode: " + String(ESP.getBootMode()) + "\tSketchSize: " + String(ESP.getSketchSize()) + "\tFreeSketchSpace: " + String(ESP.getFreeSketchSpace()), INFO);
   //message("getResetReason: " + ESP.getResetReason() + " |getResetInfo: " + ESP.getResetInfo() + " |Address : " + getAddressString(insideThermometer[0]), INFO);
 }
+
 
