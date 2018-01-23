@@ -42,6 +42,10 @@ In Smart Heater project used:
 Releases and pre-releases can be found here https://github.com/AndreyShamis/SmartRoomHeater/releases
 Production release v0.5
 
+## Requirements
+* Enable/Disable graph
+* Timer for KEEP mode
+
 ## Code review
 For code review used https://review.gerrithub.io
 Integrated with TRAVIS CI
