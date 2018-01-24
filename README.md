@@ -45,6 +45,7 @@ Production release v0.5
 ## Requirements
 * Enable/Disable graph
 * Timer for KEEP mode
+* Timer for disable
 
 ## Code review
 For code review used https://review.gerrithub.io
