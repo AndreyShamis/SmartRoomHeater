@@ -20,8 +20,10 @@ export PATH_TO_TAR="../${ARDUINO_TAR}"
 export ARDUINO_LIB="${HOME}/Arduino/libraries/"
 
 export BOARD_NODEMCU_SETTINGS=CpuFrequency=80,UploadSpeed=921600,FlashSize=4M3M
+export BOARD_NODEMCU=esp8266:esp8266:nodemcu:${BOARD_NODEMCU_SETTINGS} #nodeMCU v2 - 1.0
 export BOARD_NODEMCUV2=esp8266:esp8266:nodemcuv2:${BOARD_NODEMCU_SETTINGS} #nodeMCU v2 - 1.0
-export BOARD=${BOARD_NODEMCUV2}
+export BOARD_1=${BOARD_NODEMCU}
+export BOARD_2=${BOARD_NODEMCUV2}
 
 rm -rf  "${HOME}/.arduino15"
 rm -rf "${HOME}/Arduino"
@@ -35,6 +37,7 @@ export DISPLAY=:1.0
 success "_####################### Installing ARDUINO_#######################"
 
 if [ ! -f "${PATH_TO_TAR}" ]; then
+  error "${PATH_TO_TAR} not exist - downloading"
 	wget -O ${PATH_TO_TAR} http://downloads.arduino.cc/${ARDUINO_TAR}
 else
 	info "File  exist [ ${ARDUINO_TAR} in ${PATH_TO_TAR} ], using local file."
@@ -70,11 +73,15 @@ success "_####################### Installing esp8266 in arduino _###############
 ./${ARDUINO_V_FOLDER}/arduino --pref "boardsmanager.additional.urls=${NODEMCU_ARDUINO_PKG_URL}" --save-prefs
 ./${ARDUINO_V_FOLDER}/arduino --install-boards esp8266:esp8266 --save-prefs
 
-
-
-echo "\n###############################################################\n"
-echo "Checking ${BOARD}"
-./${ARDUINO_V_FOLDER}/arduino --verify --board ${BOARD} --verbose SmartRoomHeater.ino
-
+success "\n###############################################################\n"
 #./${ARDUINO_V_FOLDER}/arduino-builder -compile -logger=machine -hardware /var/lib/jenkins/workspaces/SmartRoomHeater/31/arduino-1.8.5/hardware -tools /var/lib/jenkins/workspaces/SmartRoomHeater/31/arduino-1.8.5/tools-builder -tools /var/lib/jenkins/workspaces/SmartRoomHeater/31/arduino-1.8.5/hardware/tools/avr -built-in-libraries /var/lib/jenkins/workspaces/SmartRoomHeater/31/arduino-1.8.5/libraries -libraries /var/lib/jenkins/Arduino/libraries -fqbn=esp8266:esp8266:nodemcuv2:CpuFrequency=80,UploadSpeed=921600,FlashSize=4M3M -ide-version=10805  -warnings=null -prefs=preferences-file=/var/lib/jenkins/workspaces/SmartRoomHeater/31/.arduino/preferences.txt -libraries=/var/lib/jenkins/workspaces/SmartRoomHeater/31/Arduino/libraries -prefs=build.warn_data_percentage=75  -verbose SmartRoomHeater.ino
-echo "Finish ${BOARD}\n\n"
+
+info "Checking ${BOARD_1}"
+./${ARDUINO_V_FOLDER}/arduino --verify --board ${BOARD_1} --verbose SmartRoomHeater.ino
+success "${BOARD_1} - finished successfully"
+
+info "Checking ${BOARD_2}"
+./${ARDUINO_V_FOLDER}/arduino --verify --board ${BOARD_2} --verbose SmartRoomHeater.ino
+success "${BOARD_2} - finished successfully"
+
+success "\n-----------------------------------------------------\nFinish\n\n"
