@@ -1,14 +1,16 @@
+#!/bin/bash -xe
 info() {
-  echo "\033[1;33m[Info]    $1  \033[0m"
+  echo -e "\033[1;33m[Info]    $1  \033[0m"
 }
 
 error() {
-  echo "\033[1;31m[Error]   $1  \033[0m"
+  echo -e "\033[1;31m[Error]   $1  \033[0m"
 }
 
 success() {
-  echo "\033[1;32m[Success] $1 \033[0m"
+  echo -e "\033[1;32m[Success] $1 \033[0m"
 }
+
 
 export ARDUINO_V="1.8.5"
 export NODEMCU_ARDUINO_PKG_URL="http://arduino.esp8266.com/stable/package_esp8266com_index.json"
