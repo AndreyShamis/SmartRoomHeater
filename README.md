@@ -46,6 +46,7 @@ Production release v0.5
 * Enable/Disable graph
 * Timer for KEEP mode
 * Timer for disable
+* Add scheme of connection
 
 ## Code review
 For code review used https://review.gerrithub.io
